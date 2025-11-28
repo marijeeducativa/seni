@@ -1,0 +1,2 @@
+
+ALTER TABLE cursos ADD COLUMN seccion TEXT;

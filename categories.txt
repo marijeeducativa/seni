@@ -1,0 +1,7 @@
+{
+  "id": 146,
+  "id_categoria": 17,
+  "categorias_indicadores": {
+    "nombre_categoria": "SOCIOAFECTIVA, IDENTIDAD Y AUTONOMÍA"
+  }
+}
