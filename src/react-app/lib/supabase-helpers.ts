@@ -97,6 +97,7 @@ export async function deleteUsuario(id: number) {
 // ==================== CURSOS ====================
 
 export async function getCursos() {
+    console.log('[getCursos] Fetching cursos...')
     const { data, error } = await supabase
         .from('cursos')
         .select('*, usuarios(nombre, apellido)')
@@ -104,7 +105,12 @@ export async function getCursos() {
         .order('nombre_curso')
         .order('seccion')
 
-    if (error) throw error
+    if (error) {
+        console.error('[getCursos] Error:', error)
+        throw error
+    }
+
+    console.log('[getCursos] Data received:', data)
 
     return data.map((curso: any) => ({
         ...curso,
