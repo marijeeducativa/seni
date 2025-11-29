@@ -24,7 +24,18 @@ type Variables = {
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 app.use("/*", cors({
-    origin: (origin) => origin || "http://localhost:5173",
+    origin: (origin) => {
+        // Allow localhost for development
+        if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
+            return origin || "http://localhost:5173";
+        }
+        // Allow Vercel deployments
+        if (origin.includes("vercel.app")) {
+            return origin;
+        }
+        // Fallback to localhost
+        return "http://localhost:5173";
+    },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

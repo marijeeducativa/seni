@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "../supabase";
+import { getApiUrl } from "../config";
 
 interface User {
   id: number;
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set cookie for API
         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax; Secure`;
 
-        const response = await fetch("/api/users/me", {
+        const response = await fetch(getApiUrl("api/users/me"), {
           headers: {
             Authorization: `Bearer ${session.access_token}`
           }
