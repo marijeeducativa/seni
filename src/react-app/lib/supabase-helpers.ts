@@ -702,25 +702,34 @@ export async function seedIndicadores() {
 
 export async function getBoletinData(estudianteId: number) {
     // ... (existing getBoletinData)
-    // 1. Get student info with course
+    // 1. Get student info
     const { data: estudiante, error: estError } = await supabase
         .from('estudiantes')
-        .select(`
-            *,
-            cursos:id_curso_actual (
-                nombre_curso,
-                seccion,
-                anio_escolar,
-                usuarios:id_maestro (
-                    nombre,
-                    apellido
-                )
-            )
-        `)
+        .select('*')
         .eq('id', estudianteId)
         .single()
 
     if (estError) throw estError
+
+    // 1.1 Get course info manually to avoid FK issues
+    let cursoData = null;
+    if (estudiante.id_curso_actual) {
+        const { data: curso, error: cursoError } = await supabase
+            .from('cursos')
+            .select(`
+                *,
+                usuarios (
+                    nombre,
+                    apellido
+                )
+            `)
+            .eq('id', estudiante.id_curso_actual)
+            .single()
+
+        if (!cursoError) {
+            cursoData = curso;
+        }
+    }
 
     // 2. Get center config
     const { data: config } = await supabase
@@ -730,7 +739,7 @@ export async function getBoletinData(estudianteId: number) {
 
     // 3. Get indicators for the course
     // Logic similar to getIndicadores but we need to filter by course name
-    let cursoNombre = estudiante.cursos?.nombre_curso
+    let cursoNombre = cursoData?.nombre_curso
 
     // Handle Párvulo I levels
     if (['Párvulo I', 'Parvulo I', 'Párvulo 1', 'Parvulo 1'].includes(cursoNombre) && estudiante.nivel_parvulo) {
@@ -784,14 +793,14 @@ export async function getBoletinData(estudianteId: number) {
     return {
         estudiante: {
             ...estudiante,
-            curso: estudiante.cursos?.nombre_curso,
-            seccion: estudiante.cursos?.seccion,
-            anio_escolar: estudiante.cursos?.anio_escolar,
-            grado_nivel: `${estudiante.cursos?.nombre_curso}${estudiante.cursos?.seccion ? ` - ${estudiante.cursos?.seccion}` : ''}`
+            curso: cursoData?.nombre_curso,
+            seccion: cursoData?.seccion,
+            anio_escolar: cursoData?.anio_escolar,
+            grado_nivel: `${cursoData?.nombre_curso}${cursoData?.seccion ? ` - ${cursoData?.seccion}` : ''}`
         },
         maestro: {
-            nombre: estudiante.cursos?.usuarios?.nombre || '',
-            apellido: estudiante.cursos?.usuarios?.apellido || ''
+            nombre: cursoData?.usuarios?.nombre || '',
+            apellido: cursoData?.usuarios?.apellido || ''
         },
         config: config || {},
         indicadores: indicadoresFormatted,
