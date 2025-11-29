@@ -32,16 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set cookie for API
         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax; Secure`;
 
+        console.log('[AuthContext] Fetching user from API...');
         const response = await fetch(getApiUrl("api/users/me"), {
           headers: {
             Authorization: `Bearer ${session.access_token}`
           }
         });
 
+        console.log('[AuthContext] API response status:', response.status);
+
         if (response.ok) {
           const data = await response.json();
+          console.log('[AuthContext] User data received:', data);
           setUser(data);
         } else {
+          const errorText = await response.text();
+          console.error('[AuthContext] API error:', response.status, errorText);
           setUser(null);
         }
       } else {
@@ -49,7 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax; Secure`;
         setUser(null);
       }
-    } catch {
+    } catch (error) {
+      console.error('[AuthContext] fetchUser error:', error);
       setUser(null);
     } finally {
       setLoading(false);
