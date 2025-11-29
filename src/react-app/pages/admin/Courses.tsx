@@ -1,6 +1,8 @@
 import AdminLayout from "@/react-app/components/AdminLayout";
 import { useEffect, useState } from "react";
 import { BookOpen, Plus, Edit2, Trash2, X } from "lucide-react";
+import { getCursos, getUsuarios } from "@/react-app/lib/supabase-helpers";
+import { supabase } from "@/react-app/supabase";
 
 interface Curso {
   id: number;
@@ -53,11 +55,8 @@ export default function AdminCourses() {
 
   const fetchCursos = async () => {
     try {
-      const response = await fetch("/api/cursos");
-      if (response.ok) {
-        const data = await response.json();
-        setCursos(Array.isArray(data) ? data : []);
-      }
+      const data = await getCursos();
+      setCursos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching cursos:", error);
     } finally {
@@ -67,11 +66,8 @@ export default function AdminCourses() {
 
   const fetchMaestros = async () => {
     try {
-      const response = await fetch("/api/usuarios");
-      if (response.ok) {
-        const data = await response.json();
-        setMaestros(Array.isArray(data) ? data.filter((u: Usuario) => u.rol === "maestro") : []);
-      }
+      const data = await getUsuarios();
+      setMaestros(Array.isArray(data) ? data.filter((u: Usuario) => u.rol === "maestro") : []);
     } catch (error) {
       console.error("Error fetching maestros:", error);
     }

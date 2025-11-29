@@ -1,6 +1,7 @@
 import AdminLayout from "@/react-app/components/AdminLayout";
 import { Users, GraduationCap, BookOpen, ClipboardCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getStats } from "@/react-app/lib/supabase-helpers";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -11,13 +12,9 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    // Fetch statistics from the API
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((data) => {
-        setStats(data);
-      })
-      .catch(() => {});
+    getStats()
+      .then((data) => setStats(data))
+      .catch(() => { });
   }, []);
 
   const statCards = [
