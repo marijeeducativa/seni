@@ -1,6 +1,7 @@
 import AdminLayout from "@/react-app/components/AdminLayout";
 import { useEffect, useState } from "react";
 import { ClipboardList, Plus, Edit2, Trash2, X, Filter } from "lucide-react";
+import { getIndicadores, getCategorias, createIndicador, updateIndicador, deleteIndicador, createCategoria } from "@/react-app/lib/supabase-helpers";
 
 interface Categoria {
   id: number;
@@ -38,7 +39,7 @@ export default function AdminIndicators() {
   const [editingIndicador, setEditingIndicador] = useState<Indicador | null>(null);
   const [filterCurso, setFilterCurso] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("");
-  
+
   const [formData, setFormData] = useState({
     descripcion: "",
     id_categoria: "",
@@ -59,11 +60,8 @@ export default function AdminIndicators() {
 
   const fetchCategorias = async () => {
     try {
-      const response = await fetch("/api/categorias-indicadores");
-      if (response.ok) {
-        const data = await response.json();
-        setCategorias(Array.isArray(data) ? data : []);
-      }
+      const data = await getCategorias();
+      setCategorias(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching categorias:", error);
     }
@@ -71,11 +69,8 @@ export default function AdminIndicators() {
 
   const fetchIndicadores = async () => {
     try {
-      const response = await fetch("/api/indicadores");
-      if (response.ok) {
-        const data = await response.json();
-        setIndicadores(Array.isArray(data) ? data : []);
-      }
+      const data = await getIndicadores();
+      setIndicadores(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching indicadores:", error);
     } finally {
@@ -86,30 +81,24 @@ export default function AdminIndicators() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const url = editingIndicador ? `/api/indicadores/${editingIndicador.id}` : "/api/indicadores";
-    const method = editingIndicador ? "PUT" : "POST";
-
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          id_categoria: formData.id_categoria ? Number(formData.id_categoria) : null,
-          orden: Number(formData.orden),
-        }),
-      });
+      const indicadorData = {
+        ...formData,
+        id_categoria: formData.id_categoria ? Number(formData.id_categoria) : null,
+        orden: Number(formData.orden),
+      };
 
-      if (response.ok) {
-        fetchIndicadores();
-        closeModal();
+      if (editingIndicador) {
+        await updateIndicador(editingIndicador.id, indicadorData);
       } else {
-        const error = await response.json();
-        alert(error.error || "Error al guardar el indicador");
+        await createIndicador(indicadorData);
       }
-    } catch (error) {
+
+      fetchIndicadores();
+      closeModal();
+    } catch (error: any) {
       console.error("Error saving indicador:", error);
-      alert("Error al guardar el indicador");
+      alert(error.message || "Error al guardar el indicador");
     }
   };
 
@@ -117,23 +106,13 @@ export default function AdminIndicators() {
     e.preventDefault();
 
     try {
-      const response = await fetch("/api/categorias-indicadores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(categoryFormData),
-      });
-
-      if (response.ok) {
-        fetchCategorias();
-        setShowCategoryModal(false);
-        setCategoryFormData({ nombre_categoria: "", descripcion: "" });
-      } else {
-        const error = await response.json();
-        alert(error.error || "Error al guardar la categoría");
-      }
-    } catch (error) {
+      await createCategoria(categoryFormData);
+      fetchCategorias();
+      setShowCategoryModal(false);
+      setCategoryFormData({ nombre_categoria: "", descripcion: "" });
+    } catch (error: any) {
       console.error("Error saving category:", error);
-      alert("Error al guardar la categoría");
+      alert(error.message || "Error al guardar la categoría");
     }
   };
 
@@ -141,12 +120,11 @@ export default function AdminIndicators() {
     if (!confirm("¿Estás seguro de que deseas eliminar este indicador?")) return;
 
     try {
-      const response = await fetch(`/api/indicadores/${id}`, { method: "DELETE" });
-      if (response.ok) {
-        fetchIndicadores();
-      }
-    } catch (error) {
+      await deleteIndicador(id);
+      fetchIndicadores();
+    } catch (error: any) {
       console.error("Error deleting indicador:", error);
+      alert(error.message || "Error al eliminar el indicador");
     }
   };
 
