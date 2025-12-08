@@ -771,14 +771,245 @@ export async function getBoletinData(estudianteId: number) {
     })) || []
 
     // 4. Get evaluations
+}
+
+if (result.error) throw result.error
+}
+
+// ==================== CONFIGURACIÓN CENTRO ====================
+
+export async function getConfiguracionCentro() {
+    const { data, error } = await supabase
+        .from('configuracion_centro')
+        .select('*')
+        .maybeSingle()
+
+    if (error) throw error
+    return data
+}
+
+export async function saveConfiguracionCentro(config: any) {
+    const { data: existing } = await supabase
+        .from('configuracion_centro')
+        .select('id')
+        .maybeSingle()
+
+    let result
+    if (existing) {
+        result = await supabase
+            .from('configuracion_centro')
+            .update({
+                nombre_centro: config.nombre_centro,
+                codigo_centro: config.codigo_centro,
+                direccion: config.direccion,
+                telefono: config.telefono,
+                email: config.email,
+                regional: config.regional,
+                distrito: config.distrito,
+                logo_minerd_url: config.logo_minerd_url,
+                logo_centro_url: config.logo_centro_url,
+                director_nombre: config.director_nombre,
+                anio_escolar_actual: config.anio_escolar_actual,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id)
+    } else {
+        result = await supabase
+            .from('configuracion_centro')
+            .insert({
+                nombre_centro: config.nombre_centro,
+                codigo_centro: config.codigo_centro,
+                direccion: config.direccion,
+                telefono: config.telefono,
+                email: config.email,
+                regional: config.regional,
+                distrito: config.distrito,
+                logo_minerd_url: config.logo_minerd_url,
+                logo_centro_url: config.logo_centro_url,
+                director_nombre: config.director_nombre,
+                anio_escolar_actual: config.anio_escolar_actual
+            })
+    }
+
+    if (result.error) throw result.error
+}
+
+
+
+export async function seedIndicadores() {
+    try {
+        console.log("Starting indicator seeding process...");
+        let insertedCount = 0;
+
+        // 1. Create Categories
+        const categoryMap: Record<string, number> = {};
+
+        for (const cat of CATEGORIES_SEED) {
+            // Check if category exists
+            const { data: existing } = await supabase
+                .from('categorias_indicadores')
+                .select('id')
+                .eq('nombre_categoria', cat.nombre)
+                .single();
+
+            if (existing) {
+                categoryMap[cat.nombre] = existing.id;
+            } else {
+                const { data: newCat, error } = await supabase
+                    .from('categorias_indicadores')
+                    .insert({ nombre_categoria: cat.nombre, descripcion: cat.descripcion })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                if (newCat) categoryMap[cat.nombre] = newCat.id;
+            }
+        }
+
+        // 2. Insert Indicators
+        for (const ind of INDICATORS_SEED) {
+            const catId = categoryMap[ind.cat];
+            if (!catId) continue;
+
+            // Check if indicator exists
+            const { data: existing } = await supabase
+                .from('indicadores')
+                .select('id')
+                .eq('descripcion', ind.desc)
+                .eq('niveles_aplicables', ind.nivel)
+                .single();
+
+            if (!existing) {
+                const { error } = await supabase
+                    .from('indicadores')
+                    .insert({
+                        descripcion: ind.desc,
+                        id_categoria: catId,
+                        niveles_aplicables: ind.nivel,
+                        tipo_evaluacion: 'cualitativa',
+                        orden: ind.orden
+                    });
+
+                if (error) {
+                    console.error(`Error inserting indicator: ${ind.desc}`, error);
+                } else {
+                    insertedCount++;
+                }
+            }
+        }
+
+        return { success: true, count: insertedCount };
+    } catch (error) {
+        console.error("Error seeding indicators:", error);
+        throw error;
+    }
+}
+
+export async function getBoletinData(estudianteId: number) {
+    // ... (existing getBoletinData)
+    // 1. Get student info
+    const { data: estudiante, error: estError } = await supabase
+        .from('estudiantes')
+        .select('*')
+        .eq('id', estudianteId)
+        .single()
+
+    if (estError) throw estError
+
+    // 1.1 Get course info manually to avoid FK issues
+    let cursoData = null;
+    if (estudiante.id_curso_actual) {
+        const { data: curso, error: cursoError } = await supabase
+            .from('cursos')
+            .select(`
+                *,
+                usuarios (
+                    nombre,
+                    apellido
+                )
+            `)
+            .eq('id', estudiante.id_curso_actual)
+            .single()
+
+        if (!cursoError) {
+            cursoData = curso;
+        }
+    }
+
+    // 2. Get center config
+    const { data: config } = await supabase
+        .from('configuracion_centro')
+        .select('*')
+        .maybeSingle()
+
+    // 3. Get indicators for the course
+    // Logic similar to getIndicadores but we need to filter by course name
+    let cursoNombre = cursoData?.nombre_curso
+
+    // Handle Párvulo I levels
+    if (['Párvulo I', 'Parvulo I', 'Párvulo 1', 'Parvulo 1'].includes(cursoNombre) && estudiante.nivel_parvulo) {
+        cursoNombre = estudiante.nivel_parvulo
+    }
+
+    const { data: indicadores } = await supabase
+        .from('indicadores')
+        .select('*, categorias_indicadores(nombre_categoria)')
+        .eq('is_active', true)
+        .ilike('niveles_aplicables', `%${cursoNombre}%`)
+        .order('orden')
+        .order('id')
+
+    // Transform indicators to include category name directly
+    const indicadoresFormatted = indicadores?.map((i: any) => ({
+        ...i,
+        nombre_categoria: i.categorias_indicadores?.nombre_categoria
+    })) || []
+
+    // 4. Get evaluations
     const { data: evaluaciones } = await supabase
         .from('evaluaciones')
         .select('*')
         .eq('id_estudiante', estudianteId)
 
-    config: config || {},
+    // Transform evaluations to nested map: { [periodo]: { [indicadorId]: valor } }
+    const evaluacionesMap: Record<string, Record<number, string>> = {}
+    evaluaciones?.forEach((ev: any) => {
+        if (!evaluacionesMap[ev.periodo_evaluacion]) {
+            evaluacionesMap[ev.periodo_evaluacion] = {}
+        }
+        evaluacionesMap[ev.periodo_evaluacion][ev.id_indicador] = ev.valor_evaluacion
+    })
+
+    // 5. Get observations
+    const { data: observaciones } = await supabase
+        .from('observaciones_periodicas')
+        .select('*')
+        .eq('id_estudiante', estudianteId)
+
+    // Transform observations to map: { [periodo]: { cualidades..., necesita... } }
+    const observacionesMap: Record<string, any> = {}
+    observaciones?.forEach((obs: any) => {
+        observacionesMap[obs.periodo_evaluacion] = {
+            cualidades_destacar: obs.cualidades_destacar,
+            necesita_apoyo: obs.necesita_apoyo
+        }
+    })
+
+    return {
+        estudiante: {
+            ...estudiante,
+            curso: cursoData?.nombre_curso,
+            seccion: cursoData?.seccion,
+            anio_escolar: cursoData?.anio_escolar,
+            grado_nivel: `${cursoData?.nombre_curso}${cursoData?.seccion ? ` - ${cursoData?.seccion}` : ''}`
+        },
+        maestro: {
+            nombre: cursoData?.usuarios?.nombre || '',
+            apellido: cursoData?.usuarios?.apellido || ''
+        },
+        config: config || {},
         indicadores: indicadoresFormatted,
-            evaluaciones: evaluacionesMap,
-                observaciones: observacionesMap
-}
+        evaluaciones: evaluacionesMap,
+        observaciones: observacionesMap
+    }
 }
