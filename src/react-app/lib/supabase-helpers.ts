@@ -776,45 +776,9 @@ export async function getBoletinData(estudianteId: number) {
         .select('*')
         .eq('id_estudiante', estudianteId)
 
-    // Transform evaluations to nested map: { [periodo]: { [indicadorId]: valor } }
-    const evaluacionesMap: Record<string, Record<number, string>> = {}
-    evaluaciones?.forEach((ev: any) => {
-        if (!evaluacionesMap[ev.periodo_evaluacion]) {
-            evaluacionesMap[ev.periodo_evaluacion] = {}
-        }
-        evaluacionesMap[ev.periodo_evaluacion][ev.id_indicador] = ev.valor_evaluacion
-    })
-
-    // 5. Get observations
-    const { data: observaciones } = await supabase
-        .from('observaciones_periodicas')
-        .select('*')
-        .eq('id_estudiante', estudianteId)
-
-    // Transform observations to map: { [periodo]: { cualidades..., necesita... } }
-    const observacionesMap: Record<string, any> = {}
-    observaciones?.forEach((obs: any) => {
-        observacionesMap[obs.periodo_evaluacion] = {
-            cualidades_destacar: obs.cualidades_destacar,
-            necesita_apoyo: obs.necesita_apoyo
-        }
-    })
-
-    return {
-        estudiante: {
-            ...estudiante,
-            curso: cursoData?.nombre_curso,
-            seccion: cursoData?.seccion,
-            anio_escolar: cursoData?.anio_escolar,
-            grado_nivel: `${cursoData?.nombre_curso}${cursoData?.seccion ? ` - ${cursoData?.seccion}` : ''}`
-        },
-        maestro: {
-            nombre: cursoData?.usuarios?.nombre || '',
-            apellido: cursoData?.usuarios?.apellido || ''
-        },
-        config: config || {},
+    config: config || {},
         indicadores: indicadoresFormatted,
-        evaluaciones: evaluacionesMap,
-        observaciones: observacionesMap
-    }
+            evaluaciones: evaluacionesMap,
+                observaciones: observacionesMap
+}
 }

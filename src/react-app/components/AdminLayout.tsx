@@ -1,6 +1,6 @@
 import { useAuth } from "@/react-app/contexts/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogOut, Users, GraduationCap, BookOpen, ClipboardList, LayoutDashboard, Database, Settings, FileStack } from "lucide-react";
+import { LogOut, Users, GraduationCap, BookOpen, ClipboardList, LayoutDashboard, Database, Settings, FileStack, Eye, Bell } from "lucide-react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -23,6 +23,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: "/admin/courses", label: "Cursos", icon: BookOpen },
     { path: "/admin/indicators", label: "Indicadores", icon: ClipboardList },
     { path: "/admin/bulk-bulletins", label: "Imprimir Boletines", icon: FileStack },
+    { path: "/admin/supervision/observaciones", label: "Supervisión Obs.", icon: Eye },
+    { path: "/admin/comunicados", label: "Avisos", icon: Bell },
     { path: "/admin/seed-indicators", label: "Cargar Datos", icon: Database },
     { path: "/admin/settings", label: "Configuración", icon: Settings },
   ];
@@ -58,14 +60,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <nav className="p-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
               >
                 <Icon className="w-5 h-5" />

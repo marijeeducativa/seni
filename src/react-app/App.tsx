@@ -15,6 +15,8 @@ import EvaluateStudent from "@/react-app/pages/teacher/EvaluateStudent";
 import BulletinPreview from "@/react-app/pages/teacher/BulletinPreview";
 import BulkBulletinPrint from "@/react-app/pages/teacher/BulkBulletinPrint";
 import ProtectedRoute from "@/react-app/components/ProtectedRoute";
+import AdminObservationReview from "@/react-app/pages/admin/ObservationReview";
+import AdminNotices from "@/react-app/pages/admin/TeacherNotices";
 
 export default function App() {
   return (
@@ -29,6 +31,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="administrador">
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/comunicados"
+            element={
+              <ProtectedRoute requiredRole="administrador">
+                <AdminNotices />
               </ProtectedRoute>
             }
           />
@@ -93,6 +103,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="administrador">
                 <BulkBulletinPrint />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/supervision/observaciones"
+            element={
+              <ProtectedRoute requiredRole="administrador">
+                <AdminObservationReview />
               </ProtectedRoute>
             }
           />
