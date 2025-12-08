@@ -616,24 +616,24 @@ export default function BulkBulletinPrint() {
                         const obs = data.observaciones?.[periodoKey] || { cualidades_destacar: "", necesita_apoyo: "" };
 
                         return (
-                          <div key={periodo} className="border border-black p-1.5 flex-grow">
+                          <div key={periodo} className="border border-black p-1.5 flex-grow flex flex-col min-h-[80px]">
                             <div className="font-bold bg-gray-100 px-1.5 py-0.5 text-[10px] mb-1 border-b border-gray-300">
                               {periodo}
                             </div>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <div className="border-r border-gray-300 pr-1.5">
+                            <div className="grid grid-cols-2 gap-1.5 flex-1">
+                              <div className="border-r border-gray-300 pr-1.5 flex flex-col">
                                 <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
                                   Cualidades a destacar:
                                 </span>
-                                <div className="h-10 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
+                                <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
                                   {obs.cualidades_destacar}
                                 </div>
                               </div>
-                              <div>
+                              <div className="flex flex-col">
                                 <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
                                   Aspectos a estimular:
                                 </span>
-                                <div className="h-10 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
+                                <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
                                   {obs.necesita_apoyo}
                                 </div>
                               </div>
