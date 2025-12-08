@@ -1,6 +1,6 @@
 import AdminLayout from "@/react-app/components/AdminLayout";
 import { useEffect, useState } from "react";
-import { Send, Trash2, Check, ExternalLink } from "lucide-react";
+import { Send, Check } from "lucide-react";
 import { getAvisos, createAviso } from "@/react-app/lib/supabase-helpers";
 
 interface Aviso {

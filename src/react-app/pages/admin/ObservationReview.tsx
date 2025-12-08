@@ -1,7 +1,7 @@
 import AdminLayout from "@/react-app/components/AdminLayout";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Search, BookOpen, User, Edit3, Save, CheckCircle, ChevronRight, ArrowLeft } from "lucide-react";
+
+import { BookOpen, User, Save, CheckCircle, ChevronRight, ArrowLeft } from "lucide-react";
 import { getCursos, getEstudiantes, getObservaciones, saveObservacion } from "@/react-app/lib/supabase-helpers";
 
 interface Curso {
@@ -10,6 +10,7 @@ interface Curso {
     nivel: string;
     seccion: string | null;
     maestro_nombre: string | null;
+    anio_escolar?: string;
 }
 
 interface Estudiante {
@@ -26,7 +27,7 @@ interface ObservacionData {
 const PERIODOS = ["1er Período", "2do Período", "3er Período"];
 
 export default function AdminObservationReview() {
-    const navigate = useNavigate();
+
     const [viewState, setViewState] = useState<'courses' | 'students' | 'edit'>('courses');
     const [cursos, setCursos] = useState<Curso[]>([]);
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
