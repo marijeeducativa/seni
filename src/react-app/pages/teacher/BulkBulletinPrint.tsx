@@ -282,7 +282,7 @@ export default function BulkBulletinPrint() {
 
 
 
-  const getIndicatorDistribution = (data: BulletinData) => {
+  const getIndicatorDistribution = (data: BulletinData): { leftIndicators: Indicador[], rightIndicators: Indicador[], observationsIndicators: Indicador[] } => {
     // Clone and summarize
     const allIndicators = [...data.indicadores].sort((a, b) => a.orden - b.orden).map(ind => ({
       ...ind,
@@ -291,142 +291,427 @@ export default function BulkBulletinPrint() {
 
     const normalizeCat = (cat: string | null) => (cat || "").trim().toLowerCase();
     const courseName = (data.estudiante.curso || "").trim();
+    const cursoNorm = normalizeCat(courseName);
+
+    // Helpers
+    const normalize = (str: string) => str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const filterAndSortByList = (indicators: Indicador[], list: string[]) => {
+      const filtered = indicators.filter(ind => {
+        const desc = normalize(ind.original_descripcion || ind.descripcion || "");
+        return list.some(item => desc.includes(normalize(item)));
+      });
+
+      return filtered.sort((a, b) => {
+        const descA = normalize(a.original_descripcion || a.descripcion || "");
+        const descB = normalize(b.original_descripcion || b.descripcion || "");
+        const indexA = list.findIndex(l => descA.includes(normalize(l)));
+        const indexB = list.findIndex(l => descB.includes(normalize(l)));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+    };
 
     if (courseName === "Kinder") {
-      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-      );
+      const socioStrings = [
+        "Comunica ideas y emociones para ser entendido",
+        "Utiliza técnicas/materiales para expresar sentimientos",
+        "Escucha y valora las opiniones de los demás",
+        "Expresa ideas/sentimientos con imágenes/masilla",
+        "Describe situaciones problemáticas de forma creativa",
+        "Comparte gustos y preferencias con respeto",
+        "Valora a compañeros respetando ideas y sentimientos"
+      ];
+      // Note: File lists 8 lines but 9th seems blank? Actually line 8 is "Valora..."
+      // Line 2 to 8 -> 7 items?
+      // Let's copy strictly from file content.
+      // File Content:
+      // 2: Comunica...
+      // 3: Utiliza...
+      // 4: Escucha...
+      // 5: Expresa...
+      // 6: Describe...
+      // 7: Comparte...
+      // 8: Valora...
+      // Total 7? But I counted 8 earlier. Ah, "Comunica ideas y emociones" is line 2.
+      // Let's re-verify line count.
+      // 1: Header
+      // 2,3,4,5,6,7,8.  That is 7 items.
+      // Wait, I might have miscounted or missed one. "Comunica ideas..." is 1st.
+      // Let's trust the strings I construct now.
 
-      const socioemocional = getByDomain("socioemocional");
-      const artistico = getByDomain("artístico")
-        .concat(getByDomain("artistico"))
-        .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i); // Dedupe
+      // Removed duplicate declaration
 
-      const psicomotor = getByDomain("psicomotor");
-      const descubrimiento = getByDomain("descubrimiento");
-      const cognitivo = getByDomain("cognitivo");
-      const comunicativo = getByDomain("comunicativo");
+      const artStrings = [
+        "Identifica 3-4 elementos de cultura dominicana",
+        "Usa lenguajes artísticos para comunicar ideas",
+        "Explora y manipula títeres en improvisaciones",
+        "Explora posibilidades sonoras (cuerpo/instrumentos)",
+        "Entona canciones con instrumentos de percusión",
+        "Escucha cuentos musicales identificando sonidos",
+        "Mueve su cuerpo espontáneamente con música",
+        "Reproduce patrones rítmicos sencillos"
+      ];
 
-      // Logic derived from BulletinPreview:
-      // Left: Socioemocional + Artistico + Psicomotor(Left 4)
-      // Right: Psicomotor(Right) + Descubrimiento + Cognitivo(Matrix)
-      // Obs: Cognitivo(Last 5) OR Communicativo(Last X) depending on data availability.
-      // Standard for Kinder usually puts Communicativo or part of Cognitivo in observations.
+      const psicoStrings = [
+        "Realiza movimientos (direcciones/velocidades)",
+        "Ubica objetos según indicaciones derecha-izquierda",
+        "Explora objetos en juegos reales o imaginarios",
+        "Imita situaciones a partir de cuentos/rondas",
+        "Participa en juegos grupales aceptando reglas",
+        "Coordina movimientos de partes del cuerpo",
+        "Se desplaza con estabilidad y equilibrio",
+        "Experimenta estiramiento y relajación",
+        "Participa en higiene y cuidado personal con apoyo"
+      ];
 
-      // If Communicativo exists, use it for observations (standard flow if available)
-      if (comunicativo.length > 0) {
-        const psicomotorLeft = psicomotor.slice(0, 4);
-        const psicomotorRight = psicomotor.slice(4);
+      const desStrings = [
+        "Describe situaciones de su comunidad (apoyo adulto)",
+        "Participa en proyectos de problemas comunitarios",
+        "Colabora buscando información de temas de interés",
+        "Cuestiona y explora su entorno natural con ayuda",
+        "Usa utensilios/tecnología para experimentos sencillos",
+        "Registra resultados de exploración (oral/escrita/gráfica)",
+        "Comprende importancia del manejo de desechos",
+        "Identifica semejanzas y diferencias en seres vivos",
+        "Usa información conocida para apoyar explicaciones",
+        "Colabora y explica medidas de protección ambiental"
+      ];
 
-        return {
-          leftIndicators: [
-            ...socioemocional,
-            ...artistico,
-            ...psicomotorLeft
-          ],
-          rightIndicators: [
-            ...psicomotorRight,
-            ...descubrimiento,
-            ...cognitivo
-          ],
-          observationsIndicators: comunicativo
-        };
-      } else {
-        // Fallback: Use Cognitivo split if Communicativo is missing/empty
-        const cognitivoForMatrix = cognitivo.slice(0, -5);
-        const cognitivoForObservations = cognitivo.slice(-5);
-        const psicomotorLeft = psicomotor.slice(0, 4);
-        const psicomotorRight = psicomotor.slice(4);
+      const cogStrings = [
+        "Ordena hechos sencillos usando imaginación",
+        "Predice acontecimientos según experiencias previas",
+        "Asume reglas acordadas en juegos",
+        "Integra objetos a juegos simulando situaciones",
+        "Responde preguntas sobre situaciones del contexto",
+        "Expresa ideas sobre observaciones y actividades",
+        "Expresa acuerdos/desacuerdos ante hechos cotidianos",
+        "Participa buscando alternativas a problemas",
+        "Colabora en la solución de problemas sencillos"
+      ];
 
-        return {
-          leftIndicators: [...socioemocional, ...artistico, ...psicomotorLeft],
-          rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivoForMatrix],
-          observationsIndicators: cognitivoForObservations
-        };
-      }
-    }
+      let socio = filterAndSortByList(allIndicators, socioStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO SOCIOEMOCIONAL" }));
+      let art = filterAndSortByList(allIndicators, artStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO ARTÍSTICO Y CREATIVO" }));
+      let psico = filterAndSortByList(allIndicators, psicoStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO PSICOMOTOR Y DE SALUD" }));
+      let des = filterAndSortByList(allIndicators, desStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO DESCUBRIMIENTO DEL MUNDO" }));
+      let cog = filterAndSortByList(allIndicators, cogStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO COGNITIVO" }));
 
-    if (courseName === "Prekinder") {
-      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-      );
+      // Balance: 
+      // Socio(7) + Art(8) + Psico(9) = 24.
+      // Des(10) + Cog(9) = 19.
+      // Uneven. 24 vs 19.
+      // Move part of Psico?
+      // Psico(9). If 4 Left -> 7+8+4 = 19. Right: 5+10+9 = 24.
+      // If 6 Left -> 7+8+6 = 21. Right: 3+10+9 = 22. Better. 
+      // Psicomotor split index 6.
 
-      const socioemocional = getByDomain("socioemocional");
-      const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-      const psicomotor = getByDomain("psicomotor");
-      const descubrimiento = getByDomain("descubrimiento");
-      const cognitivo = getByDomain("cognitivo");
-      const comunicativo = getByDomain("comunicativo");
-
-      // Prekinder logic: 
-      // Left: Socio + Art + Psico(half)
-      // Right: Psico(half) + Descu + Cogni
-      // Obs: Comunicativo
-
-      const psicomotorHalf = Math.ceil(psicomotor.length / 2);
-      const psicomotorLeft = psicomotor.slice(0, psicomotorHalf);
-      const psicomotorRight = psicomotor.slice(psicomotorHalf);
+      const psicoSplit = 6;
+      const psicoLeft = psico.slice(0, psicoSplit);
+      const psicoRight = psico.slice(psicoSplit);
 
       return {
-        leftIndicators: [
-          ...socioemocional,
-          ...artistico,
-          ...psicomotorLeft
-        ],
-        rightIndicators: [
-          ...psicomotorRight,
-          ...descubrimiento,
-          ...cognitivo
-        ],
-        observationsIndicators: comunicativo
+        leftIndicators: [...socio, ...art, ...psicoLeft],
+        rightIndicators: [...psicoRight, ...des, ...cog],
+        observationsIndicators: []
       };
     }
 
-    if (courseName === "Párvulo II") {
-      const relacionesSocioafectivas = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("relaciones"));
-      const descubrimientoEntorno = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("descubrimiento"));
-      const comunicativoIndicators = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("lenguaje"));
+    if (courseName === "Prekinder") {
+      const socioStrings = [
+        "Expresa sentimientos/emociones de forma gráfica/oral",
+        "Sigue secuencia en textos orales expresando gestos",
+        "Usa formas de expresión para comunicar opiniones",
+        "Colabora en la solución de problemas sencillos",
+        "Responde preguntas sobre situaciones de su contexto",
+        "Comprende el orden lógico de actividades de rutina",
+        "Expresa acciones que le producen bienestar",
+        "Demuestra afecto con gestos y palabras"
+      ];
 
-      const comunicativoForMatrix = comunicativoIndicators.slice(0, -12);
-      const comunicativoForObservations = comunicativoIndicators.slice(-12);
+      const artStrings = [
+        "Realiza dibujos representando ideas reales/imaginarias",
+        "Maneja títeres contando historias con compañeros",
+        "Conversa sobre personajes en dramatizaciones",
+        "Combina colores primarios/secundarios en dibujos",
+        "Explora con su cuerpo sonidos y movimientos",
+        "Explora posibilidades sonoras (voz, instrumentos)",
+        "Entona canciones acompañadas de percusión"
+      ];
 
-      const descubrimientoLeft = descubrimientoEntorno.slice(0, 13);
-      const descubrimientoRight = descubrimientoEntorno.slice(13);
+      const psicoStrings = [
+        "Realiza movimientos (direcciones/velocidades)",
+        "Muestra estabilidad y equilibrio en desplazamientos",
+        "Explora y manipula objetos en juegos",
+        "Experimenta estiramiento, relajación y descanso",
+        "Imita situaciones reales/imaginarias en juegos",
+        "Participa en actividades de higiene personal",
+        "Reproduce secuencias rítmicas con el cuerpo"
+      ];
+
+      const desStrings = [
+        "Describe situaciones de su comunidad local",
+        "Participa en actividades de la comunidad",
+        "Comparte información sobre su entorno inmediato",
+        "Cuestiona y explora su entorno natural",
+        "Describe características de seres vivos",
+        "Dialoga sobre el respeto a seres vivos",
+        "Participa en el cuidado del entorno escolar",
+        "Colabora en la reducción de desechos y uso de agua"
+      ];
+
+      const cogStrings = [
+        "Ordena hechos sencillos de la realidad",
+        "Predice acontecimientos según experiencias previas",
+        "Asume reglas acordadas en algunos juegos",
+        "Integra objetos a juegos simulando situaciones",
+        "Responde preguntas sobre actividades del contexto",
+        "Expresa ideas sobre lo que observa",
+        "Participa en búsqueda de soluciones cotidianas",
+        "Expresa acuerdos o desacuerdos ante hechos"
+      ];
+
+      const comStrings = [
+        "Escucha textos cortos asociando imágenes/palabras",
+        "Comunica ideas mediante imágenes/textos icónicos",
+        "Comprende textos orales sencillos y pregunta",
+        "Produce textos orales con lenguaje no verbal",
+        "Escucha su nombre e intenta escribirlo",
+        "Utiliza la narración con ayuda del adulto",
+        "Respeta reglas de comunicación (espera turno)",
+        "Identifica problemas y expresa soluciones oralmente"
+      ];
+
+      let socio = filterAndSortByList(allIndicators, socioStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO SOCIOEMOCIONAL" }));
+      let art = filterAndSortByList(allIndicators, artStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO ARTÍSTICO Y CREATIVO" }));
+      let psico = filterAndSortByList(allIndicators, psicoStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO PSICOMOTOR Y DE SALUD" }));
+      let des = filterAndSortByList(allIndicators, desStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO DESCUBRIMIENTO DEL MUNDO" }));
+      let cog = filterAndSortByList(allIndicators, cogStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO COGNITIVO" }));
+      let com = filterAndSortByList(allIndicators, comStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO COMUNICATIVO" }));
+
+      // Socio(8) + Art(7) + Psico(7) = 22.
+      // Des(8) + Cog(8) + Com(8) = 24.
+      // Split: 22 / 24. Close enough.
 
       return {
-        leftIndicators: [...relacionesSocioafectivas, ...descubrimientoLeft],
-        rightIndicators: [...descubrimientoRight, ...comunicativoForMatrix],
-        observationsIndicators: comunicativoForObservations
+        leftIndicators: [...socio, ...art, ...psico],
+        rightIndicators: [...des, ...cog, ...com],
+        observationsIndicators: []
+      };
+    }
+
+    if (cursoNorm.includes("parvulo i") && !cursoNorm.includes("ii") && !cursoNorm.includes("iii")) {
+      // Combined Párvulo 1 (Etapa 1 & 2)
+      const socioStrings = [
+        "Expresa necesidades y sentimientos (llanto, gestos)",
+        "Muestra agrado ante demostraciones de afecto",
+        "Imita reacciones que ve en sus cuidadores",
+        "Explora su entorno cercano con apoyo",
+        "Reacciona al escuchar su nombre",
+        "Expresa sentimientos/necesidades con vocalizaciones",
+        "Reacciona ante afecto de familiares y extraños",
+        "Demuestra apego y se separa por corto tiempo",
+        "Participa en higiene y alimentación",
+        "Reconoce su imagen en diferentes representaciones",
+        "Reconoce por su nombre a miembros de su familia",
+        "Explora por sí solo y reconoce objetos",
+        "Imita normas sociales en interacciones"
+      ];
+
+      const comStrings = [
+        "Presta atención a la interacción comunicativa",
+        "Crea significados a partir de la narración del adulto",
+        "Expresa necesidades con gestos globales y contacto visual",
+        "Observa con interés objetos e imágenes",
+        "Imita gestos/expresiones para necesidades",
+        "Usa espontáneamente gestos con pares/adultos",
+        "Comprende informaciones durante la conversación",
+        "Interactúa con libros e imágenes literarias"
+      ];
+
+      const desStrings = [
+        "Sostiene la cabeza y busca sonidos",
+        "Percibe partes de su cuerpo mediante masajes",
+        "Juega con manos y pies usando juguetes",
+        "Manifiesta emociones espontáneamente (movimientos)",
+        "Realiza expresiones faciales ante situaciones",
+        "Empuja su cuerpo con las piernas",
+        "Gira su cuerpo 360 grados (abdomen)",
+        "Arrastra su cuerpo (patrón cruzado)",
+        "Alcanza objetos boca abajo impulsándose",
+        "Balancea su cuerpo de derecha a izquierda",
+        "Desplaza su cuerpo gateando/arrastrándose",
+        "Manifiesta alegría al verse en espejo",
+        "Se pone de pie con apoyo",
+        "Mantiene el equilibrio de sentado a parado",
+        "Toca partes de su cuerpo imitando al adulto",
+        "Imita movimientos sencillos de manos/brazos",
+        "Desplaza su cuerpo gateando",
+        "Gira su cuerpo rodando",
+        "Arrastra su cuerpo reptando",
+        "Alcanza objetos impulsándose",
+        "Interactúa con juguetes y objetos cotidianos",
+        "Entra y saca objetos de una caja",
+        "Aprieta y suelta objetos blandos"
+      ];
+
+      let socio = filterAndSortByList(allIndicators, socioStrings).map(i => ({ ...i, nombre_categoria: "RELACIONES SOCIOAFECTIVAS" }));
+      let com = filterAndSortByList(allIndicators, comStrings).map(i => ({ ...i, nombre_categoria: "LENGUAJE E INTERACCIÓN" }));
+      let des = filterAndSortByList(allIndicators, desStrings).map(i => ({ ...i, nombre_categoria: "DESCUBRIMIENTO DEL CUERPO Y ENTORNO" }));
+
+      // Distribution: Total ~44.
+      // Split half.
+      const half = Math.ceil((socio.length + com.length + des.length) / 2);
+      const all = [...socio, ...com, ...des];
+
+      return {
+        leftIndicators: all.slice(0, half),
+        rightIndicators: all.slice(half),
+        observationsIndicators: []
+      };
+    }
+
+    if (courseName === "Párvulo II" || cursoNorm.includes("parvulo ii") || cursoNorm.includes("parvulo 2")) {
+      const socioStrings = [
+        "Reconoce objetos y espacios habituales",
+        "Usa normas sociales en interacciones (si se solicita)",
+        "Expresa sentimientos y afectos hacia otros",
+        "Juega explorando el ambiente con seguridad",
+        "Decide qué actividad le gusta o no realizar",
+        "Se identifica a sí mismo y a otros en fotos/imágenes",
+        "Responde y expresa su nombre",
+        "Tolera que otros usen juguetes u objetos comunes"
+      ];
+
+      const comStrings = [
+        "Reconoce objetos/personas al ser nombrados",
+        "Sigue instrucciones simples de rutina",
+        "Responde preguntas simples",
+        "Imita sonidos/movimientos de cuentos y canciones",
+        "Expresa necesidades con palabras/gestos/frases",
+        "Nombra objetos y acciones mientras juega",
+        "Elige e imita leer libros ilustrados",
+        "Formula preguntas al explorar libros"
+      ];
+
+      const desStrings = [
+        "Controla su cuerpo al pararse sin apoyo",
+        "Manipula objetos para producir sonidos (ritmo)",
+        "Usa manos para orientar pelotas/objetos",
+        "Coordina ojo-pie/ojo-mano (patear, atrapar)",
+        "Expresa ideas gráficamente (garabateo)",
+        "Realiza juegos de arrastre, empuje y golpeo"
+      ];
+
+      let socio = filterAndSortByList(allIndicators, socioStrings).map(i => ({ ...i, nombre_categoria: "RELACIONES SOCIOAFECTIVAS E IDENTIDAD" }));
+      let com = filterAndSortByList(allIndicators, comStrings).map(i => ({ ...i, nombre_categoria: "LENGUAJE E INTERACCIÓN" }));
+      let des = filterAndSortByList(allIndicators, desStrings).map(i => ({ ...i, nombre_categoria: "DESCUBRIMIENTO DEL CUERPO Y ENTORNO" }));
+
+      // Total 22. 11/11.
+      // Left: Socio (8) + Com (3) = 11.
+      // Right: Com (5) + Des (6) = 11.
+
+      const comSplit = 3;
+      const comLeft = com.slice(0, comSplit);
+      const comRight = com.slice(comSplit);
+
+      return {
+        leftIndicators: [...socio, ...comLeft],
+        rightIndicators: [...comRight, ...des],
+        observationsIndicators: []
       };
     }
 
     if (courseName === "Preprimario") {
-      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-      );
+      const socioStrings = [
+        "Comunica ideas y emociones con intención clara",
+        "Usa técnicas para expresar sentimientos/experiencias",
+        "Expresa ideas a través de producciones digitales",
+        "Conversa sobre distintos temas escuchando a otros",
+        "Comunica opinión sustentada con razones",
+        "Colabora en plan de solución de problemas",
+        "Identifica miembros de familia y costumbres",
+        "Cumple deberes y actividades escolares",
+        "Comenta historias/personajes de familia/comunidad"
+      ];
 
-      const socioemocional = getByDomain("socioemocional");
-      const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-      const psicomotor = getByDomain("psicomotor");
-      const descubrimiento = getByDomain("descubrimiento");
-      const cognitivo = getByDomain("cognitivo");
-      const comunicativo = getByDomain("comunicativo");
+      const artStrings = [
+        "Combina colores primarios/secundarios intencionalmente",
+        "Reproduce elementos de cultura dominicana/otras",
+        "Reproduce/crea patrones rítmicos y melódicos",
+        "Danza en forma espontánea con materiales diversos",
+        "Dibuja con precisión e intencionalidad comunicativa",
+        "Crea figuras 2D y 3D utilizando papel",
+        "Describe trama/personajes de dramatizaciones",
+        "Maneja títeres contando historias a otros",
+        "Representa situaciones a partir de poesía/cuentos"
+      ];
 
-      const comunicativoForMatrix = comunicativo.slice(0, -8);
-      const comunicativoForObservations = comunicativo.slice(-8);
+      const psicoStrings = [
+        "Comunica ideas a través del movimiento y juego",
+        "Identifica lateralidad en acciones y formaciones",
+        "Expresa disponibilidad para actividad física",
+        "Participa en juegos reglados cumpliendo normas",
+        "Realiza movimientos coordinados en espacio total",
+        "Realiza movimientos (dirección/posición/velocidad)",
+        "Se desplaza con equilibrio y control postural",
+        "Experimenta estiramiento, respiración y relajación",
+        "Cuida su cuerpo practicando hábitos de higiene"
+      ];
 
-      const psicomotorLeft = psicomotor.slice(0, -3);
-      const psicomotorRight = psicomotor.slice(-3);
+      const desStrings = [
+        "Experimenta, infiere y registra resultados",
+        "Comunica resultados de exploración (oral/escrita/gráfica)",
+        "Identifica semejanzas/diferencias en seres vivos",
+        "Cuestiona y explora entorno profundizando temas",
+        "Usa TIC y artefactos en experimentos/tareas",
+        "Aplica pasos del método científico con apoyo",
+        "Describe eventos, fenómenos naturales y seguridad",
+        "Colabora en manejo de desechos y reciclaje",
+        "Participa en proyectos y propone acciones ambientales"
+      ];
+
+      const cogStrings = [
+        "Interpreta gráficas/símbolos matemáticos del entorno",
+        "Completa series numéricas hasta el 9",
+        "Realiza adición/sustracción con objetos/representaciones",
+        "Agrupa objetos, explica criterios y analiza situaciones",
+        "Realiza agrupaciones para organizar información",
+        "Reproduce/crea patrones (tamaño, longitud, cantidad)",
+        "Apoya explicaciones con información conocida",
+        "Identifica patrones en actividades diarias",
+        "Organiza ideas para juegos y actividades",
+        "Participa en juegos lógicos respetando reglas",
+        "Participa en búsqueda de soluciones a problemas"
+      ];
+
+      const comStrings = [
+        "Sigue una secuencia en textos orales escuchados",
+        "Formula y responde preguntas para obtener información",
+        "Asume normas de comunicación establecidas",
+        "Responde preguntas sencillas sobre idea general de un texto",
+        "Interpreta mensajes a partir de imágenes y símbolos",
+        "Lee progresivamente (convencional/no) imágenes y palabras",
+        "Expresa ideas de textos escuchados o leídos",
+        "Escribe su nombre de manera no convencional o convencional",
+        "Produce textos basados en situaciones reales/imaginarias"
+      ];
+
+      let socio = filterAndSortByList(allIndicators, socioStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO SOCIOEMOCIONAL" }));
+      let art = filterAndSortByList(allIndicators, artStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO ARTÍSTICO Y CREATIVO" }));
+      let psico = filterAndSortByList(allIndicators, psicoStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO PSICOMOTOR Y DE SALUD" }));
+      let des = filterAndSortByList(allIndicators, desStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO DESCUBRIMIENTO DEL MUNDO" }));
+      let cog = filterAndSortByList(allIndicators, cogStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO COGNITIVO" }));
+      let com = filterAndSortByList(allIndicators, comStrings).map(i => ({ ...i, nombre_categoria: "DOMINIO COMUNICATIVO" }));
+
+      // Socio(9) + Art(9) + Psico(9) = 27.
+      // Des(9) + Cog(11) + Com(9) = 29.
+      // 27 / 29.
 
       return {
-        leftIndicators: [...socioemocional, ...artistico, ...psicomotorLeft],
-        rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivo, ...comunicativoForMatrix],
-        observationsIndicators: comunicativoForObservations
+        leftIndicators: [...socio, ...art, ...psico],
+        rightIndicators: [...des, ...cog, ...com],
+        observationsIndicators: []
       };
     }
 
-    // PÁRVULO III LOGIC
-    const cursoNorm = normalizeCat(courseName);
     if (cursoNorm.includes("parvulo iii") || cursoNorm.includes("parvulo 3")) {
       const relacionesList = [
         "Elige y completa una actividad",
