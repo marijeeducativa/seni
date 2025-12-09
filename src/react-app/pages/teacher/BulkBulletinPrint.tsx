@@ -279,43 +279,92 @@ export default function BulkBulletinPrint() {
     return summaries[desc] || desc;
   };
 
-};
 
-const getIndicatorDistribution = (data: BulletinData) => {
-  // Clone and summarize
-  const allIndicators = [...data.indicadores].sort((a, b) => a.orden - b.orden).map(ind => ({
-    ...ind,
-    descripcion: summarizeIndicator(ind.descripcion, data.estudiante.curso)
-  }));
 
-  const normalizeCat = (cat: string | null) => (cat || "").trim().toLowerCase();
-  const courseName = (data.estudiante.curso || "").trim();
+  const getIndicatorDistribution = (data: BulletinData) => {
+    // Clone and summarize
+    const allIndicators = [...data.indicadores].sort((a, b) => a.orden - b.orden).map(ind => ({
+      ...ind,
+      descripcion: summarizeIndicator(ind.descripcion, data.estudiante.curso)
+    }));
 
-  if (courseName === "Kinder") {
-    const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-      normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-    );
+    const normalizeCat = (cat: string | null) => (cat || "").trim().toLowerCase();
+    const courseName = (data.estudiante.curso || "").trim();
 
-    const socioemocional = getByDomain("socioemocional");
-    const artistico = getByDomain("artístico")
-      .concat(getByDomain("artistico"))
-      .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i); // Dedupe
+    if (courseName === "Kinder") {
+      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
+        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
+      );
 
-    const psicomotor = getByDomain("psicomotor");
-    const descubrimiento = getByDomain("descubrimiento");
-    const cognitivo = getByDomain("cognitivo");
-    const comunicativo = getByDomain("comunicativo");
+      const socioemocional = getByDomain("socioemocional");
+      const artistico = getByDomain("artístico")
+        .concat(getByDomain("artistico"))
+        .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i); // Dedupe
 
-    // Logic derived from BulletinPreview:
-    // Left: Socioemocional + Artistico + Psicomotor(Left 4)
-    // Right: Psicomotor(Right) + Descubrimiento + Cognitivo(Matrix)
-    // Obs: Cognitivo(Last 5) OR Communicativo(Last X) depending on data availability.
-    // Standard for Kinder usually puts Communicativo or part of Cognitivo in observations.
+      const psicomotor = getByDomain("psicomotor");
+      const descubrimiento = getByDomain("descubrimiento");
+      const cognitivo = getByDomain("cognitivo");
+      const comunicativo = getByDomain("comunicativo");
 
-    // If Communicativo exists, use it for observations (standard flow if available)
-    if (comunicativo.length > 0) {
-      const psicomotorLeft = psicomotor.slice(0, 4);
-      const psicomotorRight = psicomotor.slice(4);
+      // Logic derived from BulletinPreview:
+      // Left: Socioemocional + Artistico + Psicomotor(Left 4)
+      // Right: Psicomotor(Right) + Descubrimiento + Cognitivo(Matrix)
+      // Obs: Cognitivo(Last 5) OR Communicativo(Last X) depending on data availability.
+      // Standard for Kinder usually puts Communicativo or part of Cognitivo in observations.
+
+      // If Communicativo exists, use it for observations (standard flow if available)
+      if (comunicativo.length > 0) {
+        const psicomotorLeft = psicomotor.slice(0, 4);
+        const psicomotorRight = psicomotor.slice(4);
+
+        return {
+          leftIndicators: [
+            ...socioemocional,
+            ...artistico,
+            ...psicomotorLeft
+          ],
+          rightIndicators: [
+            ...psicomotorRight,
+            ...descubrimiento,
+            ...cognitivo
+          ],
+          observationsIndicators: comunicativo
+        };
+      } else {
+        // Fallback: Use Cognitivo split if Communicativo is missing/empty
+        const cognitivoForMatrix = cognitivo.slice(0, -5);
+        const cognitivoForObservations = cognitivo.slice(-5);
+        const psicomotorLeft = psicomotor.slice(0, 4);
+        const psicomotorRight = psicomotor.slice(4);
+
+        return {
+          leftIndicators: [...socioemocional, ...artistico, ...psicomotorLeft],
+          rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivoForMatrix],
+          observationsIndicators: cognitivoForObservations
+        };
+      }
+    }
+
+    if (courseName === "Prekinder") {
+      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
+        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
+      );
+
+      const socioemocional = getByDomain("socioemocional");
+      const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      const psicomotor = getByDomain("psicomotor");
+      const descubrimiento = getByDomain("descubrimiento");
+      const cognitivo = getByDomain("cognitivo");
+      const comunicativo = getByDomain("comunicativo");
+
+      // Prekinder logic: 
+      // Left: Socio + Art + Psico(half)
+      // Right: Psico(half) + Descu + Cogni
+      // Obs: Comunicativo
+
+      const psicomotorHalf = Math.ceil(psicomotor.length / 2);
+      const psicomotorLeft = psicomotor.slice(0, psicomotorHalf);
+      const psicomotorRight = psicomotor.slice(psicomotorHalf);
 
       return {
         leftIndicators: [
@@ -330,136 +379,87 @@ const getIndicatorDistribution = (data: BulletinData) => {
         ],
         observationsIndicators: comunicativo
       };
-    } else {
-      // Fallback: Use Cognitivo split if Communicativo is missing/empty
-      const cognitivoForMatrix = cognitivo.slice(0, -5);
-      const cognitivoForObservations = cognitivo.slice(-5);
-      const psicomotorLeft = psicomotor.slice(0, 4);
-      const psicomotorRight = psicomotor.slice(4);
+    }
+
+    if (courseName === "Párvulo II") {
+      const relacionesSocioafectivas = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("relaciones"));
+      const descubrimientoEntorno = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("descubrimiento"));
+      const comunicativoIndicators = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("lenguaje"));
+
+      const comunicativoForMatrix = comunicativoIndicators.slice(0, -12);
+      const comunicativoForObservations = comunicativoIndicators.slice(-12);
+
+      const descubrimientoLeft = descubrimientoEntorno.slice(0, 13);
+      const descubrimientoRight = descubrimientoEntorno.slice(13);
+
+      return {
+        leftIndicators: [...relacionesSocioafectivas, ...descubrimientoLeft],
+        rightIndicators: [...descubrimientoRight, ...comunicativoForMatrix],
+        observationsIndicators: comunicativoForObservations
+      };
+    }
+
+    if (courseName === "Preprimario") {
+      const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
+        normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
+      );
+
+      const socioemocional = getByDomain("socioemocional");
+      const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      const psicomotor = getByDomain("psicomotor");
+      const descubrimiento = getByDomain("descubrimiento");
+      const cognitivo = getByDomain("cognitivo");
+      const comunicativo = getByDomain("comunicativo");
+
+      const comunicativoForMatrix = comunicativo.slice(0, -8);
+      const comunicativoForObservations = comunicativo.slice(-8);
+
+      const psicomotorLeft = psicomotor.slice(0, -3);
+      const psicomotorRight = psicomotor.slice(-3);
 
       return {
         leftIndicators: [...socioemocional, ...artistico, ...psicomotorLeft],
-        rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivoForMatrix],
-        observationsIndicators: cognitivoForObservations
+        rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivo, ...comunicativoForMatrix],
+        observationsIndicators: comunicativoForObservations
       };
     }
-  }
 
-  if (courseName === "Prekinder") {
-    const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-      normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-    );
-
-    const socioemocional = getByDomain("socioemocional");
-    const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-    const psicomotor = getByDomain("psicomotor");
-    const descubrimiento = getByDomain("descubrimiento");
-    const cognitivo = getByDomain("cognitivo");
-    const comunicativo = getByDomain("comunicativo");
-
-    // Prekinder logic: 
-    // Left: Socio + Art + Psico(half)
-    // Right: Psico(half) + Descu + Cogni
-    // Obs: Comunicativo
-
-    const psicomotorHalf = Math.ceil(psicomotor.length / 2);
-    const psicomotorLeft = psicomotor.slice(0, psicomotorHalf);
-    const psicomotorRight = psicomotor.slice(psicomotorHalf);
+    const totalIndicators = allIndicators.length;
+    const halfPoint = Math.ceil(totalIndicators / 2);
 
     return {
-      leftIndicators: [
-        ...socioemocional,
-        ...artistico,
-        ...psicomotorLeft
-      ],
-      rightIndicators: [
-        ...psicomotorRight,
-        ...descubrimiento,
-        ...cognitivo
-      ],
-      observationsIndicators: comunicativo
+      leftIndicators: allIndicators.slice(0, halfPoint),
+      rightIndicators: allIndicators.slice(halfPoint),
+      observationsIndicators: []
     };
-  }
-
-  if (courseName === "Párvulo II") {
-    const relacionesSocioafectivas = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("relaciones"));
-    const descubrimientoEntorno = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("descubrimiento"));
-    const comunicativoIndicators = allIndicators.filter(ind => normalizeCat(ind.nombre_categoria).includes("lenguaje"));
-
-    const comunicativoForMatrix = comunicativoIndicators.slice(0, -12);
-    const comunicativoForObservations = comunicativoIndicators.slice(-12);
-
-    const descubrimientoLeft = descubrimientoEntorno.slice(0, 13);
-    const descubrimientoRight = descubrimientoEntorno.slice(13);
-
-    return {
-      leftIndicators: [...relacionesSocioafectivas, ...descubrimientoLeft],
-      rightIndicators: [...descubrimientoRight, ...comunicativoForMatrix],
-      observationsIndicators: comunicativoForObservations
-    };
-  }
-
-  if (courseName === "Preprimario") {
-    const getByDomain = (domainFragment: string) => allIndicators.filter(ind =>
-      normalizeCat(ind.nombre_categoria).includes(domainFragment.toLowerCase())
-    );
-
-    const socioemocional = getByDomain("socioemocional");
-    const artistico = getByDomain("artístico").concat(getByDomain("artistico")).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-    const psicomotor = getByDomain("psicomotor");
-    const descubrimiento = getByDomain("descubrimiento");
-    const cognitivo = getByDomain("cognitivo");
-    const comunicativo = getByDomain("comunicativo");
-
-    const comunicativoForMatrix = comunicativo.slice(0, -8);
-    const comunicativoForObservations = comunicativo.slice(-8);
-
-    const psicomotorLeft = psicomotor.slice(0, -3);
-    const psicomotorRight = psicomotor.slice(-3);
-
-    return {
-      leftIndicators: [...socioemocional, ...artistico, ...psicomotorLeft],
-      rightIndicators: [...psicomotorRight, ...descubrimiento, ...cognitivo, ...comunicativoForMatrix],
-      observationsIndicators: comunicativoForObservations
-    };
-  }
-
-  const totalIndicators = allIndicators.length;
-  const halfPoint = Math.ceil(totalIndicators / 2);
-
-  return {
-    leftIndicators: allIndicators.slice(0, halfPoint),
-    rightIndicators: allIndicators.slice(halfPoint),
-    observationsIndicators: []
   };
-};
 
-if (loading) {
-  return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-      <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-      <div className="text-gray-700 text-lg font-medium">
-        Cargando boletines...
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+        <div className="text-gray-700 text-lg font-medium">
+          Cargando boletines...
+        </div>
+        <div className="text-gray-500 text-sm mt-2">
+          {loadingProgress.current} de {loadingProgress.total} estudiantes
+        </div>
       </div>
-      <div className="text-gray-500 text-sm mt-2">
-        {loadingProgress.current} de {loadingProgress.total} estudiantes
+    );
+  }
+
+  if (allBulletins.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-500">No hay boletines para imprimir</div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-if (allBulletins.length === 0) {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-gray-500">No hay boletines para imprimir</div>
-    </div>
-  );
-}
-
-return (
-  <>
-    <style>
-      {`
+    <>
+      <style>
+        {`
           @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
           
           @media print {
@@ -477,439 +477,439 @@ return (
           
           body { font-family: 'Roboto', sans-serif; }
         `}
-    </style>
+      </style>
 
-    <div className="no-print fixed top-4 right-4 z-50 flex gap-2">
-      <button
-        onClick={() => navigate(`/teacher/cursos/${cursoId}`)}
-        className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        Volver
-      </button>
-      <button
-        onClick={handlePrint}
-        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors"
-      >
-        <Printer className="w-5 h-5" />
-        Imprimir Todos ({allBulletins.length})
-      </button>
-    </div>
+      <div className="no-print fixed top-4 right-4 z-50 flex gap-2">
+        <button
+          onClick={() => navigate(`/teacher/cursos/${cursoId}`)}
+          className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Volver
+        </button>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors"
+        >
+          <Printer className="w-5 h-5" />
+          Imprimir Todos ({allBulletins.length})
+        </button>
+      </div>
 
-    <div className="min-h-screen bg-gray-600 p-5">
-      {allBulletins.map((data, bulletinIndex) => {
-        const { leftIndicators, rightIndicators, observationsIndicators } = getIndicatorDistribution(data);
+      <div className="min-h-screen bg-gray-600 p-5">
+        {allBulletins.map((data, bulletinIndex) => {
+          const { leftIndicators, rightIndicators, observationsIndicators } = getIndicatorDistribution(data);
 
-        // Dynamic font sizing
-        const curso = data.estudiante.curso || "";
-        const isKinderLike = ["Kinder", "Prekinder"].includes(curso);
-        const isLargeFont = ["Párvulo II", "Párvulo I", "Parvulo I"].includes(curso);
-        const isParvulo3 = ["Párvulo III", "Parvulo III", "Párvulo 3", "Parvulo 3"].includes(curso);
-        const isMediumFont = curso === "Preprimario";
+          // Dynamic font sizing
+          const curso = data.estudiante.curso || "";
+          const isKinderLike = ["Kinder", "Prekinder"].includes(curso);
+          const isLargeFont = ["Párvulo II", "Párvulo I", "Parvulo I"].includes(curso);
+          const isParvulo3 = ["Párvulo III", "Parvulo III", "Párvulo 3", "Parvulo 3"].includes(curso);
+          const isMediumFont = curso === "Preprimario";
 
-        let tableTextSize = "text-[9px]";
-        let categoryTextSize = "text-[9px]";
-        let indicatorTextSize = "text-[8px] leading-tight";
+          let tableTextSize = "text-[9px]";
+          let categoryTextSize = "text-[9px]";
+          let indicatorTextSize = "text-[8px] leading-tight";
 
-        if (isLargeFont) {
-          tableTextSize = "text-[11px]";
-          categoryTextSize = "text-[12px]";
-          indicatorTextSize = "text-[11px] leading-snug";
-        } else if (isKinderLike) {
-          // Smaller than Large but bigger than base, optimized for space
-          tableTextSize = "text-[10px]";
-          categoryTextSize = "text-[11px]";
-          indicatorTextSize = "text-[9.5px] leading-tight";
-        } else if (isParvulo3) {
-          tableTextSize = "text-[10px]";
-          categoryTextSize = "text-[11px]";
-          indicatorTextSize = "text-[10px] leading-snug";
-        } else if (isMediumFont) {
-          tableTextSize = "text-[9.5px]";
-          categoryTextSize = "text-[10.5px]";
-          indicatorTextSize = "text-[9.5px] leading-tight";
-        }
+          if (isLargeFont) {
+            tableTextSize = "text-[11px]";
+            categoryTextSize = "text-[12px]";
+            indicatorTextSize = "text-[11px] leading-snug";
+          } else if (isKinderLike) {
+            // Smaller than Large but bigger than base, optimized for space
+            tableTextSize = "text-[10px]";
+            categoryTextSize = "text-[11px]";
+            indicatorTextSize = "text-[9.5px] leading-tight";
+          } else if (isParvulo3) {
+            tableTextSize = "text-[10px]";
+            categoryTextSize = "text-[11px]";
+            indicatorTextSize = "text-[10px] leading-snug";
+          } else if (isMediumFont) {
+            tableTextSize = "text-[9.5px]";
+            categoryTextSize = "text-[10.5px]";
+            indicatorTextSize = "text-[9.5px] leading-tight";
+          }
 
 
-        return (
-          <div key={data.estudiante.id} className="mb-5">
-            <div className="flex flex-col items-center gap-5">
-              {/* HOJA 1: EXTERIOR (Portada y Observaciones) */}
-              <div className="bulletin-sheet bg-white w-[11in] h-[8.5in] pt-[0.4in] px-[0.4in] pb-[0.5in] grid grid-cols-2 gap-[0.6in] shadow-lg">
-                {/* Observaciones */}
-                <div className="border-r border-gray-200 pr-4 flex flex-col">
-                  {observationsIndicators && observationsIndicators.length > 0 && (
-                    <div className="mb-2">
-                      <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
-                        <thead>
-                          <tr>
-                            <th className={`border border-gray-600 p-1 bg-blue-50 font-bold text-left uppercase ${categoryTextSize}`} colSpan={10}>
-                              Continuación de Indicadores - Dominio Cognitivo
-                            </th>
-                          </tr>
-                          <tr>
-                            <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-1/2">
-                              INDICADORES DE LOGRO
-                            </th>
-                            <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                              1ro
-                            </th>
-                            <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                              2do
-                            </th>
-                            <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                              3ro
-                            </th>
-                          </tr>
-                          <tr>
-                            <th className="border border-gray-600"></th>
-                            {[0, 1, 2].map((p) => (
-                              <>
-                                <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">L</th>
-                                <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">P</th>
-                                <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">I</th>
-                              </>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {observationsIndicators.map((ind) => {
-                            return (
-                              <tr key={`obs-ind-${ind.id}`}>
+          return (
+            <div key={data.estudiante.id} className="mb-5">
+              <div className="flex flex-col items-center gap-5">
+                {/* HOJA 1: EXTERIOR (Portada y Observaciones) */}
+                <div className="bulletin-sheet bg-white w-[11in] h-[8.5in] pt-[0.4in] px-[0.4in] pb-[0.5in] grid grid-cols-2 gap-[0.6in] shadow-lg">
+                  {/* Observaciones */}
+                  <div className="border-r border-gray-200 pr-4 flex flex-col">
+                    {observationsIndicators && observationsIndicators.length > 0 && (
+                      <div className="mb-2">
+                        <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
+                          <thead>
+                            <tr>
+                              <th className={`border border-gray-600 p-1 bg-blue-50 font-bold text-left uppercase ${categoryTextSize}`} colSpan={10}>
+                                Continuación de Indicadores - Dominio Cognitivo
+                              </th>
+                            </tr>
+                            <tr>
+                              <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-1/2">
+                                INDICADORES DE LOGRO
+                              </th>
+                              <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                                1ro
+                              </th>
+                              <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                                2do
+                              </th>
+                              <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                                3ro
+                              </th>
+                            </tr>
+                            <tr>
+                              <th className="border border-gray-600"></th>
+                              {[0, 1, 2].map((p) => (
+                                <>
+                                  <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">L</th>
+                                  <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">P</th>
+                                  <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[11px]">I</th>
+                                </>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {observationsIndicators.map((ind) => {
+                              return (
+                                <tr key={`obs-ind-${ind.id}`}>
+                                  <td className={`border border-gray-600 p-0.5 text-left ${indicatorTextSize}`}>{ind.descripcion}</td>
+                                  {["1er Período", "2do Período", "3er Período"].map((periodo, pIdx) => {
+                                    const valor = data.evaluaciones[periodo]?.[ind.id];
+                                    return (
+                                      <>
+                                        <td key={`obs-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                          {valor === "Adquirido" ? "✓" : ""}
+                                        </td>
+                                        <td key={`obs-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                          {valor === "En Proceso" ? "✓" : ""}
+                                        </td>
+                                        <td key={`obs-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                          {valor === "Iniciado" ? "✓" : ""}
+                                        </td>
+                                      </>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <h3 className="text-sm font-bold text-center mb-1.5 uppercase border-b-2 border-black pb-1">
+                      Observaciones y Comentarios
+                    </h3>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      {["1er Período (Ago - Dic)", "2do Período (Ene - Mar)", "3er Período (Abr - Jun)"].map((periodo, idx) => {
+                        const periodoKey = ["1er Período", "2do Período", "3er Período"][idx];
+                        const obs = data.observaciones?.[periodoKey] || { cualidades_destacar: "", necesita_apoyo: "" };
+
+                        return (
+                          <div key={periodo} className="border border-black p-1.5 flex flex-col min-h-[80px]">
+                            <div className="font-bold bg-gray-100 px-1.5 py-0.5 text-[10px] mb-1 border-b border-gray-300">
+                              {periodo}
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5 flex-1">
+                              <div className="border-r border-gray-300 pr-1.5 flex flex-col">
+                                <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
+                                  Cualidades a destacar:
+                                </span>
+                                <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
+                                  {obs.cualidades_destacar}
+                                </div>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
+                                  Aspectos a estimular:
+                                </span>
+                                <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
+                                  {obs.necesita_apoyo}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-0.5 text-[9px] text-center text-gray-500 italic mb-1">
+                      Nota: Este reporte valora los avances según el ritmo individual de aprendizaje.
+                    </div>
+                  </div>
+
+                  {/* Portada */}
+                  <div className="pl-4 flex flex-col justify-between">
+                    <div className="text-center">
+                      <div className="mx-auto mb-2 w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-xs border border-gray-300">
+                        {data.config.logo_minerd_url ? (
+                          <img src={data.config.logo_minerd_url} alt="Logo MINERD" className="w-full h-full object-contain rounded-full" />
+                        ) : (
+                          "[Logo Gob]"
+                        )}
+                      </div>
+
+                      <h2 className="text-xs font-bold uppercase text-gray-700 tracking-wide">
+                        Gobierno de la República Dominicana
+                      </h2>
+                      <h3 className="text-xs uppercase text-red-600 font-bold tracking-wider mt-1">
+                        Educación
+                      </h3>
+                      <h4 className="text-xs text-gray-600 mt-1 leading-tight">
+                        Viceministerio de Servicios Técnicos y Pedagógicos<br />
+                        Dirección General de Educación Inicial
+                      </h4>
+
+                      <h1 className="text-2xl font-black uppercase mt-3 mb-1 text-teal-700 tracking-tight border-b-2 border-teal-100 inline-block pb-1">
+                        Informe de Evaluación
+                      </h1>
+
+                      <div className="mx-auto mt-2 w-14 h-14 bg-gray-100 rounded-full border border-gray-300 flex items-center justify-center text-xs">
+                        {data.config.logo_centro_url ? (
+                          <img src={data.config.logo_centro_url} alt="Logo Centro" className="w-full h-full object-contain rounded-full" />
+                        ) : (
+                          "[Logo Centro]"
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-1 text-center">
+                      <h2 className="text-sm font-bold text-gray-600">
+                        Niños y niñas de {getAgeRangeForGrade(data.estudiante.curso || '', data.estudiante.nivel_parvulo)}
+                      </h2>
+                      <h2 className="text-2xl font-black text-black uppercase tracking-wide">
+                        GRADO: {data.estudiante.curso?.toUpperCase() || 'N/A'}
+                        {data.estudiante.nivel_parvulo && ` - ${data.estudiante.nivel_parvulo.toUpperCase()}`}
+                        {data.estudiante.seccion ? ` - SECCIÓN ${data.estudiante.seccion.toUpperCase()}` : ''}
+                      </h2>
+                    </div>
+
+                    <div className="flex gap-4 items-start px-2 mt-2">
+                      <div className="flex-shrink-0">
+                        <div className="w-28 h-32 border border-dashed border-gray-400 bg-gray-50 flex items-center justify-center text-xs text-gray-500">
+                          PEGAR FOTO<br />(3x4 cm)
+                        </div>
+                      </div>
+                      <div className="flex-grow pt-1 text-xs">
+                        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-baseline">
+                          <span className="font-bold">Nombre:</span>
+                          <span className="border-b border-dotted border-gray-400">{data.estudiante.nombre} {data.estudiante.apellido}</span>
+
+                          <span className="font-bold">Edad:</span>
+                          <span className="border-b border-dotted border-gray-400">{getAge(data.estudiante.fecha_nacimiento) !== null ? `${getAge(data.estudiante.fecha_nacimiento)} Años` : 'N/A'}</span>
+
+                          <span className="font-bold">Sexo:</span>
+                          <span className="border-b border-dotted border-gray-400">{data.estudiante.genero || 'N/A'}</span>
+
+                          <span className="font-bold">Grado:</span>
+                          <span className="border-b border-dotted border-gray-400">{data.estudiante.curso}{data.estudiante.seccion ? ` - Sección ${data.estudiante.seccion}` : ''}</span>
+
+                          <span className="font-bold">Año Esc.:</span>
+                          <span className="border-b border-dotted border-gray-400">{data.estudiante.anio_escolar || data.config.anio_escolar_actual || 'N/A'}</span>
+
+                          <span className="font-bold">Tanda:</span>
+                          <span className="border-b border-dotted border-gray-400">Matutina</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="px-2 space-y-1 mt-1 text-xs">
+                      <div className="grid grid-cols-[auto_1fr] gap-x-2 items-baseline">
+                        <span className="font-bold">Padre/Madre:</span>
+                        <span className="border-b border-dotted border-gray-400">{data.estudiante.nombre_tutor || 'N/A'}</span>
+
+                        <span className="font-bold">Centro:</span>
+                        <span className="border-b border-dotted border-gray-400 uppercase">{data.config.nombre_centro || 'N/A'}</span>
+
+                        <span className="font-bold">Educador/a:</span>
+                        <span className="border-b border-dotted border-gray-400 uppercase">
+                          Lic. {data.maestro.nombre} {data.maestro.apellido}
+                        </span>
+
+                        <span className="font-bold">Reg:</span>
+                        <span className="border-b border-dotted border-gray-400">{data.config.regional || 'N/A'}</span>
+
+                        <span className="font-bold">Dist:</span>
+                        <span className="border-b border-dotted border-gray-400">{data.config.distrito || 'N/A'}</span>
+
+                        <span className="font-bold">Grado Siguiente:</span>
+                        <span className="border-b border-black font-medium">{getNextGrade(data.estudiante.curso || '')}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-2 gap-8 text-center px-4">
+                      <div>
+                        <div className="border-t border-black w-3/4 mx-auto mb-1"></div>
+                        <p className="text-xs font-bold">Firma Educador/a</p>
+                      </div>
+                      <div>
+                        <div className="border-t border-black w-3/4 mx-auto mb-1"></div>
+                        <p className="text-xs font-bold">Firma Director/a</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto mb-1">
+                      <div className="text-xs text-justify bg-yellow-50 p-2 border border-yellow-200 rounded">
+                        <b>A las Familias:</b> En {data.estudiante.curso}, trabajamos los dominios de desarrollo integral.
+                        Les invitamos a revisar los indicadores para apoyar el aprendizaje de su hijo/a en casa.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* HOJA 2: INTERIOR (Matriz de Indicadores) */}
+                <div className="bulletin-sheet bg-white w-[11in] h-[8.5in] pt-[0.4in] px-[0.4in] pb-[0.5in] grid grid-cols-2 gap-[0.6in] shadow-lg">
+                  {/* Left Panel */}
+                  <div>
+                    <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
+                      <thead>
+                        <tr>
+                          <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-[44%]">
+                            INDICADORES DE LOGRO
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            1ro (Ago-Dic)
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            2do (Ene-Mar)
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            3ro (Abr-Jun)
+                          </th>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-600"></th>
+                          {[0, 1, 2].map((p) => (
+                            <>
+                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
+                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
+                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
+                            </>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leftIndicators?.map((ind, index) => {
+                          const showCategoryHeader = index === 0 ||
+                            ind.nombre_categoria !== leftIndicators?.[index - 1]?.nombre_categoria;
+
+                          return (
+                            <>
+                              {showCategoryHeader && (
+                                <tr key={`cat-${ind.nombre_categoria}-${index}`}>
+                                  <td colSpan={10} className={`border border-gray-600 bg-green-50 font-bold uppercase ${categoryTextSize} px-1.5 py-0.5 text-green-900`}>
+                                    {ind.nombre_categoria || "Sin categoría"}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr key={`left-ind-${ind.id}`} className="hover:bg-gray-50">
                                 <td className={`border border-gray-600 p-0.5 text-left ${indicatorTextSize}`}>{ind.descripcion}</td>
                                 {["1er Período", "2do Período", "3er Período"].map((periodo, pIdx) => {
                                   const valor = data.evaluaciones[periodo]?.[ind.id];
                                   return (
                                     <>
-                                      <td key={`obs-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
                                         {valor === "Adquirido" ? "✓" : ""}
                                       </td>
-                                      <td key={`obs-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
                                         {valor === "En Proceso" ? "✓" : ""}
                                       </td>
-                                      <td key={`obs-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[11px] text-[9px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
                                         {valor === "Iniciado" ? "✓" : ""}
                                       </td>
                                     </>
                                   );
                                 })}
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  <h3 className="text-sm font-bold text-center mb-1.5 uppercase border-b-2 border-black pb-1">
-                    Observaciones y Comentarios
-                  </h3>
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    {["1er Período (Ago - Dic)", "2do Período (Ene - Mar)", "3er Período (Abr - Jun)"].map((periodo, idx) => {
-                      const periodoKey = ["1er Período", "2do Período", "3er Período"][idx];
-                      const obs = data.observaciones?.[periodoKey] || { cualidades_destacar: "", necesita_apoyo: "" };
-
-                      return (
-                        <div key={periodo} className="border border-black p-1.5 flex flex-col min-h-[80px]">
-                          <div className="font-bold bg-gray-100 px-1.5 py-0.5 text-[10px] mb-1 border-b border-gray-300">
-                            {periodo}
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5 flex-1">
-                            <div className="border-r border-gray-300 pr-1.5 flex flex-col">
-                              <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
-                                Cualidades a destacar:
-                              </span>
-                              <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
-                                {obs.cualidades_destacar}
-                              </div>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[9px] uppercase font-bold text-gray-600 block mb-0.5">
-                                Aspectos a estimular:
-                              </span>
-                              <div className="flex-1 text-[9px] leading-tight overflow-hidden whitespace-pre-wrap text-justify">
-                                {obs.necesita_apoyo}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-0.5 text-[9px] text-center text-gray-500 italic mb-1">
-                    Nota: Este reporte valora los avances según el ritmo individual de aprendizaje.
-                  </div>
-                </div>
-
-                {/* Portada */}
-                <div className="pl-4 flex flex-col justify-between">
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-xs border border-gray-300">
-                      {data.config.logo_minerd_url ? (
-                        <img src={data.config.logo_minerd_url} alt="Logo MINERD" className="w-full h-full object-contain rounded-full" />
-                      ) : (
-                        "[Logo Gob]"
-                      )}
-                    </div>
-
-                    <h2 className="text-xs font-bold uppercase text-gray-700 tracking-wide">
-                      Gobierno de la República Dominicana
-                    </h2>
-                    <h3 className="text-xs uppercase text-red-600 font-bold tracking-wider mt-1">
-                      Educación
-                    </h3>
-                    <h4 className="text-xs text-gray-600 mt-1 leading-tight">
-                      Viceministerio de Servicios Técnicos y Pedagógicos<br />
-                      Dirección General de Educación Inicial
-                    </h4>
-
-                    <h1 className="text-2xl font-black uppercase mt-3 mb-1 text-teal-700 tracking-tight border-b-2 border-teal-100 inline-block pb-1">
-                      Informe de Evaluación
-                    </h1>
-
-                    <div className="mx-auto mt-2 w-14 h-14 bg-gray-100 rounded-full border border-gray-300 flex items-center justify-center text-xs">
-                      {data.config.logo_centro_url ? (
-                        <img src={data.config.logo_centro_url} alt="Logo Centro" className="w-full h-full object-contain rounded-full" />
-                      ) : (
-                        "[Logo Centro]"
-                      )}
-                    </div>
+                            </>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="mt-1 text-center">
-                    <h2 className="text-sm font-bold text-gray-600">
-                      Niños y niñas de {getAgeRangeForGrade(data.estudiante.curso || '', data.estudiante.nivel_parvulo)}
-                    </h2>
-                    <h2 className="text-2xl font-black text-black uppercase tracking-wide">
-                      GRADO: {data.estudiante.curso?.toUpperCase() || 'N/A'}
-                      {data.estudiante.nivel_parvulo && ` - ${data.estudiante.nivel_parvulo.toUpperCase()}`}
-                      {data.estudiante.seccion ? ` - SECCIÓN ${data.estudiante.seccion.toUpperCase()}` : ''}
-                    </h2>
-                  </div>
+                  {/* Right Panel */}
+                  <div>
+                    <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
+                      <thead>
+                        <tr>
+                          <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-[44%]">
+                            INDICADORES DE LOGRO
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            1ro (Ago-Dic)
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            2do (Ene-Mar)
+                          </th>
+                          <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
+                            3ro (Abr-Jun)
+                          </th>
+                        </tr>
+                        <tr>
+                          <th className="border border-gray-600"></th>
+                          {[0, 1, 2].map((p) => (
+                            <>
+                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
+                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
+                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
+                            </>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rightIndicators?.map((ind, index) => {
+                          const showCategoryHeader = index === 0 ||
+                            ind.nombre_categoria !== rightIndicators?.[index - 1]?.nombre_categoria;
 
-                  <div className="flex gap-4 items-start px-2 mt-2">
-                    <div className="flex-shrink-0">
-                      <div className="w-28 h-32 border border-dashed border-gray-400 bg-gray-50 flex items-center justify-center text-xs text-gray-500">
-                        PEGAR FOTO<br />(3x4 cm)
-                      </div>
-                    </div>
-                    <div className="flex-grow pt-1 text-xs">
-                      <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-baseline">
-                        <span className="font-bold">Nombre:</span>
-                        <span className="border-b border-dotted border-gray-400">{data.estudiante.nombre} {data.estudiante.apellido}</span>
-
-                        <span className="font-bold">Edad:</span>
-                        <span className="border-b border-dotted border-gray-400">{getAge(data.estudiante.fecha_nacimiento) !== null ? `${getAge(data.estudiante.fecha_nacimiento)} Años` : 'N/A'}</span>
-
-                        <span className="font-bold">Sexo:</span>
-                        <span className="border-b border-dotted border-gray-400">{data.estudiante.genero || 'N/A'}</span>
-
-                        <span className="font-bold">Grado:</span>
-                        <span className="border-b border-dotted border-gray-400">{data.estudiante.curso}{data.estudiante.seccion ? ` - Sección ${data.estudiante.seccion}` : ''}</span>
-
-                        <span className="font-bold">Año Esc.:</span>
-                        <span className="border-b border-dotted border-gray-400">{data.estudiante.anio_escolar || data.config.anio_escolar_actual || 'N/A'}</span>
-
-                        <span className="font-bold">Tanda:</span>
-                        <span className="border-b border-dotted border-gray-400">Matutina</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="px-2 space-y-1 mt-1 text-xs">
-                    <div className="grid grid-cols-[auto_1fr] gap-x-2 items-baseline">
-                      <span className="font-bold">Padre/Madre:</span>
-                      <span className="border-b border-dotted border-gray-400">{data.estudiante.nombre_tutor || 'N/A'}</span>
-
-                      <span className="font-bold">Centro:</span>
-                      <span className="border-b border-dotted border-gray-400 uppercase">{data.config.nombre_centro || 'N/A'}</span>
-
-                      <span className="font-bold">Educador/a:</span>
-                      <span className="border-b border-dotted border-gray-400 uppercase">
-                        Lic. {data.maestro.nombre} {data.maestro.apellido}
-                      </span>
-
-                      <span className="font-bold">Reg:</span>
-                      <span className="border-b border-dotted border-gray-400">{data.config.regional || 'N/A'}</span>
-
-                      <span className="font-bold">Dist:</span>
-                      <span className="border-b border-dotted border-gray-400">{data.config.distrito || 'N/A'}</span>
-
-                      <span className="font-bold">Grado Siguiente:</span>
-                      <span className="border-b border-black font-medium">{getNextGrade(data.estudiante.curso || '')}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 grid grid-cols-2 gap-8 text-center px-4">
-                    <div>
-                      <div className="border-t border-black w-3/4 mx-auto mb-1"></div>
-                      <p className="text-xs font-bold">Firma Educador/a</p>
-                    </div>
-                    <div>
-                      <div className="border-t border-black w-3/4 mx-auto mb-1"></div>
-                      <p className="text-xs font-bold">Firma Director/a</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-auto mb-1">
-                    <div className="text-xs text-justify bg-yellow-50 p-2 border border-yellow-200 rounded">
-                      <b>A las Familias:</b> En {data.estudiante.curso}, trabajamos los dominios de desarrollo integral.
-                      Les invitamos a revisar los indicadores para apoyar el aprendizaje de su hijo/a en casa.
-                    </div>
+                          return (
+                            <>
+                              {showCategoryHeader && (
+                                <tr key={`cat-${ind.nombre_categoria}-${index}`}>
+                                  <td colSpan={10} className={`border border-gray-600 bg-green-50 font-bold uppercase ${categoryTextSize} px-1.5 py-0.5 text-green-900`}>
+                                    {ind.nombre_categoria || "Sin categoría"}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr key={`right-ind-${ind.id}`} className="hover:bg-gray-50">
+                                <td className={`border border-gray-600 p-0.5 text-left ${indicatorTextSize}`}>{ind.descripcion}</td>
+                                {["1er Período", "2do Período", "3er Período"].map((periodo, pIdx) => {
+                                  const valor = data.evaluaciones[periodo]?.[ind.id];
+                                  return (
+                                    <>
+                                      <td key={`right-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                        {valor === "Adquirido" ? "✓" : ""}
+                                      </td>
+                                      <td key={`right-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                        {valor === "En Proceso" ? "✓" : ""}
+                                      </td>
+                                      <td key={`right-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                        {valor === "Iniciado" ? "✓" : ""}
+                                      </td>
+                                    </>
+                                  );
+                                })}
+                              </tr>
+                            </>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
 
-              {/* HOJA 2: INTERIOR (Matriz de Indicadores) */}
-              <div className="bulletin-sheet bg-white w-[11in] h-[8.5in] pt-[0.4in] px-[0.4in] pb-[0.5in] grid grid-cols-2 gap-[0.6in] shadow-lg">
-                {/* Left Panel */}
-                <div>
-                  <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
-                    <thead>
-                      <tr>
-                        <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-[44%]">
-                          INDICADORES DE LOGRO
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          1ro (Ago-Dic)
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          2do (Ene-Mar)
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          3ro (Abr-Jun)
-                        </th>
-                      </tr>
-                      <tr>
-                        <th className="border border-gray-600"></th>
-                        {[0, 1, 2].map((p) => (
-                          <>
-                            <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
-                            <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
-                            <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
-                          </>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leftIndicators?.map((ind, index) => {
-                        const showCategoryHeader = index === 0 ||
-                          ind.nombre_categoria !== leftIndicators?.[index - 1]?.nombre_categoria;
-
-                        return (
-                          <>
-                            {showCategoryHeader && (
-                              <tr key={`cat-${ind.nombre_categoria}-${index}`}>
-                                <td colSpan={10} className={`border border-gray-600 bg-green-50 font-bold uppercase ${categoryTextSize} px-1.5 py-0.5 text-green-900`}>
-                                  {ind.nombre_categoria || "Sin categoría"}
-                                </td>
-                              </tr>
-                            )}
-                            <tr key={`left-ind-${ind.id}`} className="hover:bg-gray-50">
-                              <td className={`border border-gray-600 p-0.5 text-left ${indicatorTextSize}`}>{ind.descripcion}</td>
-                              {["1er Período", "2do Período", "3er Período"].map((periodo, pIdx) => {
-                                const valor = data.evaluaciones[periodo]?.[ind.id];
-                                return (
-                                  <>
-                                    <td key={`left-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "Adquirido" ? "✓" : ""}
-                                    </td>
-                                    <td key={`left-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "En Proceso" ? "✓" : ""}
-                                    </td>
-                                    <td key={`left-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "Iniciado" ? "✓" : ""}
-                                    </td>
-                                  </>
-                                );
-                              })}
-                            </tr>
-                          </>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Right Panel */}
-                <div>
-                  <table className={"w-full border-collapse border-[1.5px] border-black " + tableTextSize}>
-                    <thead>
-                      <tr>
-                        <th className="border border-gray-600 p-0.5 bg-white font-bold text-center w-[44%]">
-                          INDICADORES DE LOGRO
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          1ro (Ago-Dic)
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          2do (Ene-Mar)
-                        </th>
-                        <th colSpan={3} className="border border-gray-600 p-0.5 bg-white font-bold text-center text-[8px]">
-                          3ro (Abr-Jun)
-                        </th>
-                      </tr>
-                      <tr>
-                        <th className="border border-gray-600"></th>
-                        {[0, 1, 2].map((p) => (
-                          <>
-                            <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
-                            <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
-                            <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
-                          </>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rightIndicators?.map((ind, index) => {
-                        const showCategoryHeader = index === 0 ||
-                          ind.nombre_categoria !== rightIndicators?.[index - 1]?.nombre_categoria;
-
-                        return (
-                          <>
-                            {showCategoryHeader && (
-                              <tr key={`cat-${ind.nombre_categoria}-${index}`}>
-                                <td colSpan={10} className={`border border-gray-600 bg-green-50 font-bold uppercase ${categoryTextSize} px-1.5 py-0.5 text-green-900`}>
-                                  {ind.nombre_categoria || "Sin categoría"}
-                                </td>
-                              </tr>
-                            )}
-                            <tr key={`right-ind-${ind.id}`} className="hover:bg-gray-50">
-                              <td className={`border border-gray-600 p-0.5 text-left ${indicatorTextSize}`}>{ind.descripcion}</td>
-                              {["1er Período", "2do Período", "3er Período"].map((periodo, pIdx) => {
-                                const valor = data.evaluaciones[periodo]?.[ind.id];
-                                return (
-                                  <>
-                                    <td key={`right-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "Adquirido" ? "✓" : ""}
-                                    </td>
-                                    <td key={`right-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "En Proceso" ? "✓" : ""}
-                                    </td>
-                                    <td key={`right-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
-                                      {valor === "Iniciado" ? "✓" : ""}
-                                    </td>
-                                  </>
-                                );
-                              })}
-                            </tr>
-                          </>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Add page break between students (except for the last one) */}
+              {bulletinIndex < allBulletins.length - 1 && (
+                <div className="bulletin-separator" style={{ height: '20px' }}></div>
+              )}
             </div>
-
-            {/* Add page break between students (except for the last one) */}
-            {bulletinIndex < allBulletins.length - 1 && (
-              <div className="bulletin-separator" style={{ height: '20px' }}></div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  </>
-);
+          );
+        })}
+      </div>
+    </>
+  );
 }
