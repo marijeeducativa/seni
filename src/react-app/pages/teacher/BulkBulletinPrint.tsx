@@ -39,6 +39,7 @@ interface Indicador {
   descripcion: string;
   nombre_categoria: string | null;
   orden: number;
+  original_descripcion?: string;
 }
 
 interface BulletinData {
@@ -424,6 +425,168 @@ export default function BulkBulletinPrint() {
       };
     }
 
+    // PÁRVULO III LOGIC
+    const cursoNorm = normalizeCat(courseName);
+    if (cursoNorm.includes("parvulo iii") || cursoNorm.includes("parvulo 3")) {
+      const relacionesList = [
+        "Elige y completa una actividad",
+        "Asume responsabilidades de acuerdo",
+        "Da las gracias, pide por favor",
+        "Intenta cumplir acuerdos de pedir",
+        "Disfruta del juego e interactúa motivado",
+        "Interactúa con otros niños expresando",
+        "Interactúa aceptando que otros usen",
+        "Utiliza gestos y palabras para manifestar",
+        "Responde a su nombre y apellidos",
+        "Dice su nombre, edad y sexo",
+        "Conoce el nombre de personas significativas"
+      ];
+
+      const descubrimientoList = [
+        "Construye torres con mayor precisión",
+        "Practica normas de autocuidado",
+        "Nombra y reconoce funciones de partes",
+        "Evita situaciones de inseguridad buscando",
+        "Sigue advertencias de seguridad ante",
+        "Colabora en el cuidado de su cuerpo",
+        "Cede ante",
+        "Se aleja del adulto interactuando",
+        "Identifica y señala partes de su cuerpo",
+        "Interactúa con objetos",
+        "Interactúa con elementos",
+        "Relaciona características de su cuerpo",
+        "Realiza juegos motrices",
+        "Realiza juegos y actividades motrices",
+        "Realiza acciones de vestirse",
+        "Participa en juegos motrices",
+        "Expresa ideas/sentimientos con acciones",
+        "Se desplaza caminando, corriendo",
+        "Trepa sobre superficies inclinadas",
+        "Mantiene equilibrio en desplazamientos",
+        "Participa en lavado de manos"
+      ];
+
+      const lenguajeList = [
+        "Participa en juegos organizados",
+        "Desarrolla imaginación",
+        "Agarra objetos grandes y pequeños",
+        "Lanza pelotas",
+        "Juegos de arrastre, empuje y golpeo",
+        "Comprende informaciones de adultos",
+        "Realiza preguntas para aclarar",
+        "Realiza acciones relacionando",
+        "Reconoce sonidos",
+        "Realiza instrucciones simples de vida",
+        "Escucha y disfruta textos literarios",
+        "Dramatiza acciones de textos",
+        "Participa en situaciones comunicativas",
+        "Emplea lenguaje",
+        "Muestra respeto a normas de conversación",
+        "Lee no convencionalmente libros",
+        "Pregunta sobre contenido de libros",
+        "Narra contenido de textos"
+      ];
+
+      const normalize = (str: string) => str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      const isInList = (ind: any, list: string[]) => {
+        const desc = normalize(ind.original_descripcion || ind.descripcion || "");
+        return list.some(item => {
+          const itemNorm = normalize(item);
+          return desc.includes(itemNorm);
+        });
+      };
+
+      let relaciones = allIndicators.filter(ind => isInList(ind, relacionesList));
+
+      let descubrimiento = allIndicators.filter(ind => {
+        const desc = normalize(ind.original_descripcion || ind.descripcion || "");
+        if (desc.includes(normalize("Interactúa con objetos")) || desc.includes(normalize("Interactúa con elementos"))) return true;
+        if (desc.includes(normalize("Realiza juegos motrices")) || desc.includes(normalize("Realiza juegos y actividades"))) return true;
+        if (desc.includes(normalize("Participa en juegos motrices")) || desc.includes(normalize("Expresa ideas"))) return true;
+        return isInList(ind, descubrimientoList);
+      });
+
+      let lenguaje = allIndicators.filter(ind => isInList(ind, lenguajeList));
+
+      const sortByList = (list: string[]) => (a: any, b: any) => {
+        const descA = normalize(a.original_descripcion || a.descripcion || "");
+        const descB = normalize(b.original_descripcion || b.descripcion || "");
+        const indexA = list.findIndex(l => descA.includes(normalize(l)));
+        const indexB = list.findIndex(l => descB.includes(normalize(l)));
+        const safeIndexA = indexA === -1 ? 999 : indexA;
+        const safeIndexB = indexB === -1 ? 999 : indexB;
+        return safeIndexA - safeIndexB;
+      };
+
+      relaciones.sort(sortByList(relacionesList));
+
+      descubrimiento.sort((a, b) => {
+        const descA = normalize(a.original_descripcion || a.descripcion || "");
+        const descB = normalize(b.original_descripcion || b.descripcion || "");
+        const getOrder = (desc: string) => {
+          if (desc.includes(normalize("Construye torres"))) return 1;
+          if (desc.includes(normalize("Practica normas"))) return 2;
+          if (desc.includes(normalize("Nombra y reconoce"))) return 3;
+          if (desc.includes(normalize("Evita situaciones"))) return 4;
+          if (desc.includes(normalize("Sigue advertencias"))) return 5;
+          if (desc.includes(normalize("Colabora en el cuidado"))) return 6;
+          if (desc.includes(normalize("Cede ante"))) return 7;
+          if (desc.includes(normalize("Se aleja del adulto"))) return 8;
+          if (desc.includes(normalize("Identifica y señala"))) return 9;
+          if (desc.includes(normalize("Interactúa con objetos"))) return 10;
+          if (desc.includes(normalize("Interactúa con elementos"))) return 11;
+          if (desc.includes(normalize("Relaciona características"))) return 12;
+          if (desc.includes(normalize("Realiza juegos motrices"))) return 13;
+          if (desc.includes(normalize("Realiza juegos y actividades"))) return 14;
+          if (desc.includes(normalize("Realiza acciones de vestirse"))) return 15;
+          if (desc.includes(normalize("Participa en juegos motrices")) || desc.includes(normalize("Expresa ideas"))) return 16;
+          if (desc.includes(normalize("Se desplaza caminando"))) return 17;
+          if (desc.includes(normalize("Trepa sobre"))) return 18;
+          if (desc.includes(normalize("Mantiene equilibrio"))) return 19;
+          if (desc.includes(normalize("Participa en lavado"))) return 20;
+          return 99;
+        };
+        return getOrder(descA) - getOrder(descB);
+      });
+
+      lenguaje.sort(sortByList(lenguajeList));
+
+      relaciones = relaciones.map(ind => ({ ...ind, nombre_categoria: "RELACIONES SOCIOAFECTIVAS, IDENTIDAD Y AUTONOMÍA" }));
+      descubrimiento = descubrimiento.map(ind => ({ ...ind, nombre_categoria: "DESCUBRIMIENTO DE SU CUERPO Y SU RELACIÓN CON EL ENTORNO" }));
+      lenguaje = lenguaje.map(ind => ({ ...ind, nombre_categoria: "LENGUAJE E INTERACCIÓN" }));
+
+      const categorizedIds = new Set([
+        ...relaciones.map(i => i.id),
+        ...descubrimiento.map(i => i.id),
+        ...lenguaje.map(i => i.id)
+      ]);
+
+      const others = allIndicators.filter(ind => {
+        if (categorizedIds.has(ind.id)) return false;
+        const indDescNorm = normalize(ind.original_descripcion || ind.descripcion || "");
+        const isDuplicate = [...relaciones, ...descubrimiento, ...lenguaje].some(catInd => {
+          const catIndDescNorm = normalize(catInd.original_descripcion || catInd.descripcion || "");
+          return indDescNorm.includes(catIndDescNorm) || catIndDescNorm.includes(indDescNorm);
+        });
+        return !isDuplicate;
+      });
+      others.sort((a, b) => a.id - b.id);
+
+      // Distribution: L(24) R(23)
+      const descubrimientoSplitIndex = 13;
+      const descubrimientoPart1 = descubrimiento.slice(0, descubrimientoSplitIndex);
+      const descubrimientoPart2 = descubrimiento.slice(descubrimientoSplitIndex);
+
+      const leftIndicators = [...relaciones, ...descubrimientoPart1];
+      const rightIndicators = [...descubrimientoPart2, ...lenguaje, ...others];
+
+      return { leftIndicators, rightIndicators, observationsIndicators: [] };
+    }
+
+
+
+
     const totalIndicators = allIndicators.length;
     const halfPoint = Math.ceil(totalIndicators / 2);
 
@@ -784,9 +947,9 @@ export default function BulkBulletinPrint() {
                           <th className="border border-gray-600"></th>
                           {[0, 1, 2].map((p) => (
                             <>
-                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
-                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
-                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
+                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">L</th>
+                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">P</th>
+                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">I</th>
                             </>
                           ))}
                         </tr>
@@ -811,13 +974,13 @@ export default function BulkBulletinPrint() {
                                   const valor = data.evaluaciones[periodo]?.[ind.id];
                                   return (
                                     <>
-                                      <td key={`left-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "Adquirido" ? "✓" : ""}
                                       </td>
-                                      <td key={`left-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "En Proceso" ? "✓" : ""}
                                       </td>
-                                      <td key={`left-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`left-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "Iniciado" ? "✓" : ""}
                                       </td>
                                     </>
@@ -853,9 +1016,9 @@ export default function BulkBulletinPrint() {
                           <th className="border border-gray-600"></th>
                           {[0, 1, 2].map((p) => (
                             <>
-                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">L</th>
-                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">P</th>
-                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[13px]">I</th>
+                              <th key={`${p}-l`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">L</th>
+                              <th key={`${p}-p`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">P</th>
+                              <th key={`${p}-i`} className="border border-gray-600 text-center text-[7px] p-0 w-[10px]">I</th>
                             </>
                           ))}
                         </tr>
@@ -880,13 +1043,13 @@ export default function BulkBulletinPrint() {
                                   const valor = data.evaluaciones[periodo]?.[ind.id];
                                   return (
                                     <>
-                                      <td key={`right-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`right-${ind.id}-p${pIdx}-l`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "Adquirido" ? "✓" : ""}
                                       </td>
-                                      <td key={`right-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`right-${ind.id}-p${pIdx}-p`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "En Proceso" ? "✓" : ""}
                                       </td>
-                                      <td key={`right-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[13px] text-[10px]">
+                                      <td key={`right-${ind.id}-p${pIdx}-i`} className="border border-gray-600 text-center p-0 font-bold text-black w-[10px] text-[10px]">
                                         {valor === "Iniciado" ? "✓" : ""}
                                       </td>
                                     </>
